@@ -810,7 +810,9 @@
       <button class="btn ghost" id="btnGenHome">🤖 AIで問題をつくる</button>
       <button class="btn ghost" id="btnEditorHome">✏️ 問題を追加・編集</button>
       <button class="btn ghost" id="btnEditDays">📅 残り日数を変更</button>
-      <button class="btn ghost" id="btnExport">⬇ 学習データ書き出し（JSON）</button>
+      <button class="btn ghost" id="btnExport">⬇ 全データ書き出し（JSON）</button>
+      <button class="btn ghost" id="btnImport">⬆ 全データ読み込み（JSON）</button>
+      <input type="file" id="stateFile" accept=".json,application/json" class="hidden-box">
       <button class="btn ghost" id="btnReset">🗑 進捗をリセット</button>
     </div>
     <div class="autosave"><span class="led"></span><span id="autoSaveText">💾 自動セーブ（LocalStorage ＋ Cookie）: 未</span></div>
@@ -1014,9 +1016,9 @@
           </div>
           <div class="field"><label for="gLevel">難易度</label>
             <select id="gLevel">
-              <option value="標準（中学校の定期テストレベル）">標準</option>
-              <option value="易しめ（基礎・単純暗記中心）">易しめ</option>
-              <option value="やや難（思考力も問う上位レベル）">やや難</option>
+              <option value="標準">標準</option>
+              <option value="易しめ">易しめ</option>
+              <option value="やや難">やや難</option>
             </select>
           </div>
         </div>
@@ -2278,10 +2280,177 @@ document.getElementById("btnExport").addEventListener("click", () => {
   const blob = new Blob([JSON.stringify(state, null, 2)], { type:"application/json" });
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
-  a.download = "gakufu-progress-" + todayISO() + ".json";
+  a.download = "gakufu-full-" + todayISO() + ".json";
   a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-  toast("JSONを書き出しました");
+  toast("⬇ 全データ（進捗・コイン・作成した問題・履歴）を書き出しました");
+});
+
+/* =========================================================================
+   9-1-2. 全データの読み込み（バックアップJSON → 確認のうえ置き換え）
+   ※ 保存形式・キーは一切変更していない。読み込みはユーザー操作時のみ。
+   ========================================================================= */
+/** Gakufuのバックアップとして読めるJSONか判定して正規化する */
+function normalizeBackup(raw){
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+  let o = raw;
+  if (o.state && typeof o.state === "object" && !Array.isArray(o.state)) o = o.state;  // 包装形式
+  if (["settings","progress","history","economy"].some(k => k in o)) return o;          // 通常の書き出し
+  if (["s","e","h","p"].some(k => k in o))                                              // Cookieスナップ形式 {v,s,e,h,p,c}
+    return { settings:o.s, economy:o.e, history:o.h, progress:o.p, custom:o.c };
+  return null;
+}
+/** 数値または数値文字列を受け付けて整数に（壊れた値は null） */
+function toNum(v, min){
+  const n = (typeof v === "string" && v.trim() !== "") ? Number(v) : v;
+  if (typeof n !== "number" || !isFinite(n)) return null;
+  const r = Math.round(n);
+  return (min !== undefined && r < min) ? min : r;
+}
+function sanitizeProgressEntry(p){
+  if (!p || typeof p !== "object") return null;
+  const out = {};
+  const lv = toNum(p.level);
+  if (lv !== null) out.level = Math.max(0, Math.min(3, lv));
+  if (typeof p.seen === "boolean") out.seen = p.seen;
+  const c = toNum(p.correct, 0);   if (c !== null) out.correct = c;
+  const w = toNum(p.wrong, 0);     if (w !== null) out.wrong = w;
+  if (p.nextReview === null || (typeof p.nextReview === "string" && /^\d{4}-\d{2}-\d{2}/.test(p.nextReview)))
+    out.nextReview = p.nextReview;
+  return Object.keys(out).length ? out : null;
+}
+function sanitizeHistory(h){
+  const out = {};
+  if (!h || typeof h !== "object") return out;
+  for (const k of Object.keys(h)){
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(k)) continue;
+    const v = h[k];
+    if (!v || typeof v !== "object") continue;
+    const a = toNum(v.answered, 0), c = toNum(v.correct, 0);
+    out[k] = { answered:a === null ? 0 : a, correct:c === null ? 0 : c };
+  }
+  return out;
+}
+function sanitizeEconomy(e){
+  if (!e || typeof e !== "object") return {};
+  const out = {};
+  for (const k of ["coins","streak","pulls","totalEarned"]){
+    const v = toNum(e[k], 0);
+    if (v !== null) out[k] = v;
+  }
+  if (typeof e.lastBonusDate === "string" || e.lastBonusDate === null) out.lastBonusDate = e.lastBonusDate;
+  if (typeof e.missionDate === "string" || e.missionDate === null) out.missionDate = e.missionDate;
+  if (typeof e.missionDone === "boolean") out.missionDone = e.missionDone;
+  if (e.collection && typeof e.collection === "object"){
+    out.collection = {};
+    for (const id of Object.keys(e.collection)) if (e.collection[id]) out.collection[id] = true;
+  }
+  return out;
+}
+/** 作成問題の復元（壊れた項目は補修、ID衝突は回避してデータ損しない） */
+function sanitizeCustom(list){
+  if (!Array.isArray(list)) return [];
+  const used = new Set(DEFAULT_QUESTIONS.map(q => q.id));
+  const out = [];
+  for (const raw of list){
+    if (!raw || typeof raw !== "object") continue;
+    const question = raw.question != null ? String(raw.question).trim() : "";
+    if (!question || raw.answer === undefined || raw.answer === null || raw.answer === "") continue;
+    let choices = Array.isArray(raw.choices) ? raw.choices.map(c => String(c).trim()).filter(Boolean) : [];
+    if (choices.length === 1) choices = [];
+    let answer;
+    if (choices.length){
+      if (typeof raw.answer === "number" && choices[raw.answer] !== undefined) answer = raw.answer;
+      else{
+        const i = choices.findIndex(c => normalizeAnswerText(c) === normalizeAnswerText(raw.answer));
+        if (i >= 0) answer = i;
+        else { answer = String(raw.answer).trim(); choices = []; }   // 不一致でも問題文と答えは残す
+      }
+    }else{
+      answer = String(raw.answer).trim();
+      if (!answer) continue;
+    }
+    let id = (typeof raw.id === "string" && raw.id.trim()) ? raw.id.trim()
+             : "u" + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
+    while (used.has(id)) id += "~";
+    used.add(id);
+    out.push({
+      id,
+      subject: (typeof raw.subject === "string" && raw.subject.trim()) ? raw.subject.trim() : "カスタム",
+      unit:    (typeof raw.unit === "string" && raw.unit.trim())    ? raw.unit.trim()    : "単元未設定",
+      question, choices, answer,
+      explain: typeof raw.explain === "string" ? raw.explain : ""
+    });
+  }
+  return out;
+}
+/** バックアップ内容で state をまるごと置き換える（欠損は既定値、壊れた値は破棄） */
+function restoreFullState(saved){
+  const s = (saved.settings && typeof saved.settings === "object") ? saved.settings : {};
+  state.settings = Object.assign({ started:false, days:7, examDate:null, se:true, subjectFilter:[] }, s);
+  if (typeof state.settings.started !== "boolean") state.settings.started = false;
+  if (typeof state.settings.se !== "boolean") state.settings.se = true;
+  if (!Array.isArray(state.settings.subjectFilter)) state.settings.subjectFilter = [];
+  if (typeof state.settings.days !== "number" || !(state.settings.days >= 1)) state.settings.days = 7;
+
+  state.custom          = sanitizeCustom(saved.custom);
+  state.removedDefaults = Array.isArray(saved.removedDefaults) ? saved.removedDefaults.filter(x => typeof x === "string") : [];
+  state.promptTemplates = Array.isArray(saved.promptTemplates)
+    ? saved.promptTemplates.filter(t => t && typeof t.id === "string" && typeof t.name === "string" && typeof t.text === "string")
+    : [];
+  state.history = sanitizeHistory(saved.history);
+  state.economy = Object.assign(
+    { coins:0, streak:0, lastBonusDate:null, collection:{}, pulls:0, totalEarned:0, missionDate:null, missionDone:false },
+    sanitizeEconomy(saved.economy)
+  );
+
+  applyQuestions();
+  state.progress = defaultProgress();
+  const sp = (saved.progress && typeof saved.progress === "object") ? saved.progress : {};
+  for (const id of Object.keys(sp)){
+    if (!state.progress[id]) continue;                 // 存在しない問題の進捗は取り込まない
+    const one = sanitizeProgressEntry(sp[id]);
+    if (one) Object.assign(state.progress[id], one);
+  }
+  ensureProgress();
+}
+
+document.getElementById("btnImport").addEventListener("click", () => {
+  document.getElementById("stateFile").click();
+});
+document.getElementById("stateFile").addEventListener("change", async (e) => {
+  const input = e.target;
+  const file = input.files && input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = async () => {
+    let data = null;
+    try{ data = normalizeBackup(JSON.parse(reader.result)); }catch(err){ data = null; }
+    if (!data){
+      SE.play("wrong");
+      toast("このJSONはGakufuのバックアップとして読み取れませんでした（書き出したJSONを選んでください）");
+      input.value = "";
+      return;
+    }
+    const ok = await confirmDialog({           // 読み込み＝置き換えなので必ず確認
+      title:"📂 全データを読み込みます",
+      message:"現在のデータ（進捗・コイン・作成した問題・履歴・設定）を、\n選んだファイルの中身でまとめて置き換えます。\n\n※ 取り返しがつくように、今の状態は先に「⬇ 全データ書き出し」で保存しておきましょう。\n※ 読み込み後はそのまま自動セーブされます。",
+      ok:"読み込んで置き換える",
+      cancel:"やめる",
+      danger:true
+    });
+    if (!ok){ input.value = ""; return; }
+
+    restoreFullState(data);
+    session = null;
+    saveState();
+    showView(["study","done"].includes(currentView) ? "home" : currentView);
+    SE.play("levelup");
+    rewardToast(`📂 全データを読み込みました（作成問題 ${state.custom.length} 問／🪙 ${state.economy.coins} コイン）`);
+    input.value = "";
+  };
+  reader.onerror = () => { SE.play("wrong"); toast("ファイルの読み込みに失敗しました"); input.value = ""; };
+  reader.readAsText(file, "utf-8");
 });
 
 /* =========================================================================
@@ -2727,6 +2896,7 @@ const FORMAT_JSON_EXAMPLE =
 ]`;
 
 let countMode = "num";   // "num" = 数字スライダー / "text" = 記述指定
+let lastPromptLabel = "";   // 直近に生成したプロンプトの問題数ラベル（コピー完了表示に使用）
 
 function genFormValues(){
   const cText = document.getElementById("gCountText").value.trim();
@@ -2760,7 +2930,7 @@ function buildPrompt(d){
       ? "- 出題形式は記述のみ。choices は必ず空配列 []、answer は答えそのものを文字列で書く"
       : "- 四択（choices 4つ）と記述（choices は []）を、だいたい半分ずつ混ぜる";
 
-  return `あなたは中学校の先生を務める、テスト対策問題づくりのプロのアシスタントです。
+  return `あなたは${d.school}の先生を務める、テスト対策問題づくりのプロのアシスタントです。
 これから「${d.school}・${d.grade}」の「${d.subject}」の「${d.unit}」のテスト対策問題を作ります。
 
 ━━━━━━━━━━━━━━━━━━━━
@@ -2768,7 +2938,7 @@ function buildPrompt(d){
 ━━━━━━━━━━━━━━━━━━━━
 作成前に、次の項目を私に質問して回答を得てください。
 1. テスト範囲の正確なところ（教科書の章・ページ・No、配布プリント名）
-2. 学年と教科書名（光村図書／東京書籍／教育出版 など）
+2. 学年と教科書名・問題集名（${d.school === "高校" ? "その教科の教科書と準拠問題集、Z会／シグマベストなど" : "光村図書／東京書籍／教育出版 など"}）
 3. 出題形式の希望（四択／記述／混合）
 4. 苦手なポイント・よく間違えるところ
 5. 難易度の希望（易しめ／標準／やや難）
@@ -2784,7 +2954,7 @@ function buildPrompt(d){
             ? `「${d.countText}」という指定を計算して決める（おおむね5〜30問。意味が曖昧ならステップ1で確認）`
             : `${d.count} 問【ちょうど ${d.count} 問。1問多く1問少なくもダメ】（1単元につき最低5問〜最大30問）`}
 - 出題形式: ${formatRule}
-- 難易度: ${d.level}
+- 難易度: ${d.level}（${d.school}の${d.grade}の定期テストとして適切な水準で）
 - 全問に日本語の解説（explain）を付ける。間違えやすいポイントを1行添える
 - 中学生が読みやすい平易な日本語。必要なら漢字にふりがなを書く
 - 同じ知識・同じ計算を問う重複問題は作らない
@@ -2953,12 +3123,15 @@ document.getElementById("btnBuildPrompt").addEventListener("click", async () => 
   const prompt = buildPrompt(d);
   const box = document.getElementById("genPrompt");
   box.value = prompt;
+  lastPromptLabel = d.countMode === "text"
+    ? `問題数「${d.countText}」の指定`
+    : `ちょうど ${d.count} 問`;
   document.getElementById("btnCopyPrompt").disabled = false;
   document.getElementById("btnClearPrompt").disabled = false;
   const ok = await copyText(prompt);
   SE.play(ok ? "levelup" : "click");
-  toast(ok ? `📋 ${d.count}問分のプロンプトをコピーしました！ AIに貼り付けてね`
-           : "📋 プロンプトを表示しました（コピーできないので手動でコピーしてね）");
+  toast(ok ? `📋 ${lastPromptLabel}のプロンプトをコピーしました！ AIに貼り付けてね`
+           : `📋 ${lastPromptLabel}のプロンプトを表示しました（コピーできないので手動でコピーしてね）`);
   box.scrollTop = 0;
 });
 
@@ -2966,10 +3139,12 @@ document.getElementById("btnCopyPrompt").addEventListener("click", async () => {
   const text = document.getElementById("genPrompt").value;
   if (!text) return;
   const ok = await copyText(text);
-  toast(ok ? "📋 コピーしました" : "コピーできませんでした。手動で選択してコピーしてください");
+  toast(ok ? `📋 コピーしました${lastPromptLabel ? `（${lastPromptLabel}）` : ""}`
+           : "コピーできませんでした。手動で選択してコピーしてください");
 });
 document.getElementById("btnClearPrompt").addEventListener("click", () => {
   document.getElementById("genPrompt").value = "";
+  lastPromptLabel = "";
   document.getElementById("btnCopyPrompt").disabled = true;
   document.getElementById("btnClearPrompt").disabled = true;
 });
