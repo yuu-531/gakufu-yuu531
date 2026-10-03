@@ -528,6 +528,24 @@
   }
   .tpl-item .nm{flex:1; font-weight:800; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
 
+  /* ============ 学習レベル選択 ============ */
+  .level-chips{display:flex; flex-wrap:wrap; gap:8px;}
+  .level-chip{
+    display:flex; flex-direction:column; align-items:flex-start; gap:2px;
+    padding:9px 14px; border-radius:14px; border:2px solid var(--line);
+    background:var(--surface2); color:var(--text); cursor:pointer; text-align:left;
+    font-weight:800; min-width:132px;
+    transition:border-color .12s ease, box-shadow .12s ease, transform .12s ease;
+  }
+  .level-chip:hover{border-color:var(--accent); transform:translateY(-1px);}
+  .level-chip.on{border-color:var(--accent); box-shadow:inset 0 0 0 2px var(--accent), 0 6px 16px rgba(0,0,0,.14);}
+  .level-chip .lv{font-size:.74rem; color:var(--muted); letter-spacing:.04em; font-weight:900; white-space:nowrap;}
+  .level-chip .rec{font-style:normal; color:#ffb300; font-weight:900; letter-spacing:0;}
+  .level-chip .nm{font-size:1rem; font-weight:900; line-height:1.2;}
+  .level-chip .sp{font-size:.78rem; color:var(--muted); font-weight:800;}
+  .level-chip .note{font-size:.7rem; color:var(--muted); font-weight:700;}
+  .level-chip.on .sp{color:var(--accent);}
+
   /* ============ 確認ダイアログ ============ */
   .dlg-actions{display:flex; gap:10px; margin-top:18px;}
   .dlg-actions .btn{flex:1;}
@@ -592,6 +610,71 @@
   .rar-banner.b-UR{background:linear-gradient(90deg,#fff3b0,#ffca28,#ffab00,#ffca28,#fff3b0); color:#3a2600;
     box-shadow:0 5px 20px rgba(255,171,0,.75); animation:bannerWiggle .8s ease-in-out infinite;}
   @keyframes bannerWiggle{0%,100%{transform:rotate(-1.4deg);} 50%{transform:rotate(1.4deg);}}
+
+  /* ==== 超激レア（XR）：虹色の最上位演出 ==== */
+  .prize.r-XR{
+    border-color:transparent; border-width:3px;
+    background:
+      linear-gradient(var(--surface2), var(--surface2)) padding-box,
+      linear-gradient(135deg,#ff4fd8,#ffd54f,#4fff9d,#4fc3ff,#b44fff,#ff4fd8) border-box;
+    box-shadow:0 0 30px rgba(255,79,216,.55), 0 0 62px rgba(79,195,255,.45);
+    animation:prizeIn .32s cubic-bezier(.2,1.4,.4,1), xrGlow 1.1s ease-in-out .35s infinite;
+  }
+  @keyframes xrGlow{
+    0%,100%{box-shadow:0 0 26px rgba(255,79,216,.5),  0 0 52px rgba(79,195,255,.4);}
+    50%    {box-shadow:0 0 46px rgba(255,213,79,.75), 0 0 92px rgba(180,79,255,.6);}
+  }
+  .prize.r-XR .face{animation:xrFace 1.2s ease-in-out infinite;}
+  @keyframes xrFace{0%,100%{transform:scale(1) rotate(-3deg);} 50%{transform:scale(1.14) rotate(3deg);}}
+  .prize.r-XR .rar{
+    background:linear-gradient(90deg,#ff4fd8,#ffd54f,#4fff9d,#4fc3ff,#b44fff,#ff4fd8);
+    background-size:220% auto; color:#160a1f;
+    animation:rainbowSlide 1.6s linear infinite;
+  }
+  .rar-banner.b-XR{
+    background:linear-gradient(90deg,#ff4fd8,#ffd54f,#4fff9d,#4fc3ff,#b44fff,#ff4fd8);
+    background-size:300% auto; color:#12071a; font-size:1.22rem; letter-spacing:.1em;
+    box-shadow:0 6px 26px rgba(255,79,216,.65), 0 0 40px rgba(79,195,255,.5);
+    animation:bannerWiggle .45s ease-in-out infinite, rainbowSlide 1.3s linear infinite;
+  }
+  @keyframes rainbowSlide{to{background-position:300% center;}}
+  .item.r-XR{border-left:5px solid #ff4fd8; box-shadow:0 0 16px rgba(180,79,255,.45);}
+  .gacha-machine.supreme{
+    box-shadow:0 0 0 3px #ff4fd8, 0 0 56px rgba(180,79,255,.8), 0 0 92px rgba(79,195,255,.6);
+    animation:machinePop .6s cubic-bezier(.2,1.5,.4,1), supremeGlow .95s ease-in-out .5s infinite;
+  }
+  @keyframes supremeGlow{
+    0%,100%{box-shadow:0 0 0 3px #ff4fd8, 0 0 50px rgba(180,79,255,.75), 0 0 84px rgba(79,195,255,.55);}
+    50%    {box-shadow:0 0 0 3px #ffd54f, 0 0 96px rgba(255,79,216,.9), 0 0 140px rgba(79,255,157,.7);}
+  }
+  .fx-rays.xr{
+    background:repeating-conic-gradient(from 0deg,
+      rgba(255,79,216,.34) 0deg 6deg, rgba(255,213,79,.34) 6deg 12deg,
+      rgba(79,255,157,.34) 12deg 18deg, rgba(79,195,255,.34) 18deg 24deg,
+      rgba(180,79,255,.34) 24deg 30deg, transparent 30deg 42deg);
+    animation:raySpin 3.6s linear infinite, rayFade 4.4s ease forwards;
+  }
+  .fx-jackpot.xr{
+    font-size:min(19vw,166px);
+    background:linear-gradient(90deg,#ff4fd8,#ffd54f,#4fff9d,#4fc3ff,#b44fff,#ff4fd8);
+    background-size:300% 100%;
+    -webkit-background-clip:text; background-clip:text; color:transparent;
+    text-shadow:none;
+    filter:drop-shadow(0 0 24px rgba(255,255,255,.9)) drop-shadow(0 7px 0 rgba(20,8,30,.55));
+    animation:jpPop .7s cubic-bezier(.2,1.6,.4,1), jpPulse .75s ease-in-out .7s infinite,
+              rainbowSlide 1.2s linear infinite;
+  }
+  .fx-jackpot.xr small{color:transparent; text-shadow:none; -webkit-background-clip:text; background-clip:text;}
+  @keyframes screenShake{
+    0%,100%{transform:translate(0,0);}
+    15%{transform:translate(-8px,4px) rotate(-.5deg);}
+    30%{transform:translate(7px,-5px) rotate(.5deg);}
+    45%{transform:translate(-6px,-4px) rotate(-.35deg);}
+    60%{transform:translate(6px,5px) rotate(.35deg);}
+    75%{transform:translate(-4px,2px);}
+    90%{transform:translate(3px,-2px);}
+  }
+  #viewGacha.fx-shake{animation:screenShake .52s ease-in-out 2;}
 
   /* ============ 成績（グラフと表） ============ */
   .stats-toolbar{
@@ -763,6 +846,24 @@
       </div>
     </div>
 
+    <h2 class="section-title">学習レベル（1回の問題数とコイン倍率）</h2>
+    <div class="card-surface" style="padding:14px 16px;">
+      <div class="level-chips" id="levelChips"></div>
+      <div id="customLevelBox" class="hidden" style="margin-top:12px; display:grid; gap:12px;">
+        <div class="row2">
+          <div class="field"><label for="lvCustomName">レベル名</label>
+            <input type="text" id="lvCustomName" maxlength="10" placeholder="マイペース"></div>
+          <div class="field"><label for="lvMultRange">コイン倍率 <b id="lvMultVal">×1.05</b>（1.00〜3.00）</label>
+            <input type="range" id="lvMultRange" min="1" max="3" step="0.05" value="1.05" aria-label="コイン倍率"></div>
+        </div>
+        <div class="field"><label for="lvCountRange">1回の問題数 <b id="lvCountVal">10</b> 問（5〜30）</label>
+          <input type="range" id="lvCountRange" min="5" max="30" step="1" value="10" aria-label="問題数"></div>
+      </div>
+      <div class="muted" style="font-size:.85rem; font-weight:700; margin-top:10px;">
+        💡 <b>5問解くごとにコイン倍率が ×1.05</b> されます（レベルの倍率と掛け算で成長）。迷ったら <b>Lv3「まじめ」</b>がおすすめ！
+      </div>
+    </div>
+
     <h2 class="section-title">出題するジャンル（教科）を選ぶ</h2>
     <div class="card-surface" style="padding:14px 16px;">
       <div class="subject-chips" id="subjectChips"></div>
@@ -789,6 +890,7 @@
         <div class="mission-bar"><i id="missionBar" style="width:0"></i></div>
         <div class="reward-rules">
           <span>⭕ 正解 +10</span><span>❌ 不正解 +1</span><span>✅ 学習クリア +30</span>
+          <span>⚡ 5問ごとに ×1.05</span>
           <span>📅 デイリー連続 +30〜</span><span>🔁 連続学習でステークUP</span>
         </div>
       </div>
@@ -832,7 +934,7 @@
     <div class="stage">
       <div class="card" id="card" role="region" aria-live="polite">
         <div class="face front">
-          <div class="q-meta"><span class="badge" id="qSubject">教科</span><span class="unit-tag" id="qUnit">単元</span><span class="unit-tag" id="qLevelTag"></span></div>
+          <div class="q-meta"><span class="badge" id="qSubject">教科</span><span class="unit-tag" id="qUnit">単元</span><span class="unit-tag" id="qLevelTag"></span><span class="unit-tag" id="lvTag"></span></div>
           <p class="q-text" id="qText">問題文</p>
           <div class="choices" id="qChoices"></div>
           <p class="front-hint" id="frontHint">まず頭の中で答えを思い出すこと。それが記憶を強くします。</p>
@@ -882,7 +984,8 @@
       <div class="card-surface gacha-machine" id="gachaMachine">
         <div class="gacha-ball" id="gachaBall">🎰</div>
         <h2 style="margin:10px 0 4px;">学習コインガチャ</h2>
-        <p class="muted" style="margin:0 0 14px; font-weight:700;">🪙 所持コイン <b id="gachaCoin2">0</b>（1回 <b>100</b>コイン）</p>
+        <p class="muted" style="margin:0 0 6px; font-weight:700;">🪙 所持コイン <b id="gachaCoin2">0</b>（1回 <b>100</b>コイン）</p>
+        <p class="muted" id="gachaOdds" style="margin:0 0 14px; font-weight:700; font-size:.8rem;"></p>
         <button class="btn primary lg" id="btnPull" style="min-width:260px;">🎰 1回引く（100コイン）<small>Enter</small></button>
         <div class="gacha-result" id="gachaResult">
           <p class="muted" style="font-weight:800;">セーブデータには絶対に影響しません。学習したコインでガチャを楽しもう！</p>
@@ -1304,7 +1407,8 @@ const COOKIE_PREFIX = "gakufu_";        // Cookie自動セーブ用プレフィ�
 const COOKIE_DAYS   = 365;              // Cookie有効期限（日）
 
 let state = {
-  settings: { started:false, days:7, examDate:null, se:true, subjectFilter:[] },
+  settings: { started:false, days:7, examDate:null, se:true, subjectFilter:[],
+              studyLevel:"lv3", customStudy:{ name:"マイペース", count:10, mult:1.05 } },   // 学習レベル（旧データに無ければ lv3 が既定）
   progress: {},   // id -> { level, nextReview, seen, correct, wrong }
   history:  {},   // "YYYY-MM-DD" -> { answered, correct }
   custom:   [],   // ユーザー・AIが追加した問題（JSON）
@@ -1509,7 +1613,7 @@ function buildCramQueue(){
     .filter(q => !f || f.includes(q.subject))
     .filter(q => state.progress[q.id].level < 3 || state.progress[q.id].wrong > 0)
     .sort((a,b) => priority(b) - priority(a))
-    .slice(0, 10)
+    .slice(0, getStudyLevel().count)   // 学習レベルの問題数ぶんだけ追い込む
     .map(q => q.id);
 }
 
@@ -1536,7 +1640,7 @@ function applyAnswer(id, isCorrect){
   saveState();
 
   // 報酬：正解 +10 / 不正解 +1 コイン → ミッション進捗も確認
-  addCoins(isCorrect ? REWARD.correct : REWARD.wrong);
+  addCoins(coinGain(isCorrect ? REWARD.correct : REWARD.wrong));   // レベル倍率＋5問ごとの成長を適用
   checkMission();
 }
 
@@ -1613,7 +1717,20 @@ const SE = (function(){
              [1046,.09, .09, "square", .14],
              [1318,.18, .09, "square", .14],
              [1568,.27, .09, "square", .14],
-             [2093,.36, .30, "square", .16]]
+             [2093,.36, .30, "square", .16]],
+    /* 超激レア専用：駆け上がり＋重厚な和音 */
+    supreme:[[523.25, 0,    .07, "square",   .15],
+             [659.25,.07,   .07, "square",   .15],
+             [783.99,.14,   .07, "square",   .15],
+             [1046.5,.21,   .07, "square",   .16],
+             [1318.5,.28,   .07, "square",   .16],
+             [1567.98,.35,  .07, "square",   .16],
+             [2093,  .42,   .10, "square",   .17],
+             [1318.5,.54,   .10, "triangle", .15],
+             [1567.98,.64,  .10, "triangle", .16],
+             [2093,  .74,   .55, "square",   .19],
+             [1046.5,.74,   .55, "triangle", .13],
+             [659.25,.74,   .55, "triangle", .11]]
   };
   return {
     unlock(){ audio(); },                     // 初回のタップ/キーで呼ぶ
@@ -1644,6 +1761,51 @@ const SE = (function(){
    5-3. 報酬システム（コイン・デイリー・ミッション）
    ========================================================================= */
 const REWARD = { correct:10, wrong:1, clear:30, mission:100, dailyBase:30, dailyStep:10, dailyCap:120 };
+
+/* ---- 学習レベル（1回の問題数とコイン倍率を変更／Lv3 が既定の推奨設定） ----
+   ※ 保存は settings.studyLevel（ID文字列）と settings.customStudy のみ。
+     旧セーブに無い場合は必ず lv3 にフォールバックする（データ非破壊）。 */
+const STUDY_LEVELS = [
+  { id:"lv1",    badge:"Lv1",    name:"すきま時間", count:5,  mult:1.00, note:"スキマ時間にやさしい" },
+  { id:"lv2",    badge:"Lv2",    name:"ふつう",     count:8,  mult:1.03, note:"ちょっとずつ積み上げ" },
+  { id:"lv3",    badge:"Lv3",    name:"まじめ",     count:10, mult:1.05, note:"おすすめ・デフォルト" },
+  { id:"lv4",    badge:"Lv4",    name:"がんばり屋", count:15, mult:1.15, note:"本気で取り組む" },
+  { id:"lv5",    badge:"Lv5",    name:"ダイハード", count:20, mult:1.30, note:"テスト直前・限界突破" },
+  { id:"custom", badge:"カスタム", name:"マイペース", count:10, mult:1.05, note:"問題数と倍率を自由に" }
+];
+function clampNum(v, min, max, dflt){
+  const n = Number(v);
+  return (isFinite(n)) ? Math.min(max, Math.max(min, n)) : dflt;
+}
+/** 現在の学習レベル（壊れた保存値・未保存時は Lv3「まじめ」） */
+function getStudyLevel(){
+  const s = state.settings || {};
+  const id = STUDY_LEVELS.some(l => l.id === s.studyLevel) ? s.studyLevel : "lv3";
+  if (id !== "custom"){
+    const lv = STUDY_LEVELS.find(l => l.id === id) || STUDY_LEVELS[2];
+    return Object.assign({}, lv);
+  }
+  const c = (s.customStudy && typeof s.customStudy === "object") ? s.customStudy : {};
+  return {
+    id:"custom", badge:"カスタム",
+    name: (typeof c.name === "string" && c.name.trim()) ? c.name.trim().slice(0, 10) : "マイペース",
+    count: Math.round(clampNum(c.count, 5, 30, 10)),
+    mult:  Math.round(clampNum(c.mult, 1, 3, 1.05) * 100) / 100,
+    note:"問題数と倍率を自由に"
+  };
+}
+/** 現在のコイン倍率 = レベル基準倍率 × 1.05^(セッション中に解いた5問ごと) */
+function currentCoinMult(){
+  const base = getStudyLevel().mult;
+  let solved = 0;
+  try{ solved = session ? (session.correct + session.wrong) : 0; }catch(e){ solved = 0; }   // 初期化前でも安全
+  return base * Math.pow(1.05, Math.floor(solved / 5));
+}
+/** コイン獲得量（倍率を適用して端数処理） */
+function coinGain(base){
+  if (!base) return 0;
+  return Math.max(1, Math.round(base * currentCoinMult()));
+}
 
 function renderCoin(){
   const el = document.getElementById("coinNum");
@@ -1733,11 +1895,15 @@ const GACHA_ITEMS = [
   { id:"s2", rarity:"SR", name:"セイハツ星人",    emoji:"🌟" },
   { id:"s3", rarity:"SR", name:"スピード秀才",    emoji:"🦸" },
   { id:"u1", rarity:"UR", name:"伝説の先生",      emoji:"👨‍🏫" },
-  { id:"u2", rarity:"UR", name:"パーフェクト王",  emoji:"👑" }
+  { id:"u2", rarity:"UR", name:"パーフェクト王",  emoji:"👑" },
+  { id:"x1", rarity:"XR", name:"知識の賢者",      emoji:"🧙" },
+  { id:"x2", rarity:"XR", name:"超学習ヒーロー",   emoji:"🦾" }
 ];
-const RARITY_WEIGHT = [["N", .58], ["R", .28], ["SR", .11], ["UR", .03]];
-const RARITY_LABEL  = { N:"N ／ ノーマル", R:"R ／ レア", SR:"SR ／ スーパーレア", UR:"UR ／ ウルトラレア" };
-const DUP_REFUND    = { N:10, R:30, SR:80, UR:200 };
+const RARITY_WEIGHT = [["N", .57], ["R", .28], ["SR", .11], ["UR", .03], ["XR", .01]];   // 合計 1.00
+const RARITY_LABEL  = { N:"N ／ ノーマル", R:"R ／ レア", SR:"SR ／ スーパーレア",
+                        UR:"UR ／ ウルトラレア", XR:"XR ／ 超激レア" };
+const RARITY_SHORT  = { N:"N", R:"R", SR:"SR", UR:"UR", XR:"超激レア" };                 // バナー表示用
+const DUP_REFUND    = { N:10, R:30, SR:80, UR:200, XR:400 };
 
 function pickRarity(){
   let r = Math.random(), acc = 0;
@@ -1747,13 +1913,14 @@ function pickRarity(){
 
 let gachaBusy = false;
 
-/** ガチャの演出：フラッシュ・紙吹雪・光条・URはジャックポット */
+/** ガチャの演出：フラッシュ・紙吹雪・光条・URはジャックポット・XRは超激レア */
 function gachaFX(rarity){
   const palettes = {
     N:  ["#b9c3d4", "#e6ebf5"],
     R:  ["#4f9dff", "#8ec5ff", "#e3f1ff"],
     SR: ["#c77dff", "#e2b3ff", "#ffffff", "#ffca28"],
-    UR: ["#ffca28", "#ff8f00", "#fff3b0", "#ffffff", "#ff6b6b"]
+    UR: ["#ffca28", "#ff8f00", "#fff3b0", "#ffffff", "#ff6b6b"],
+    XR: ["#ff4fd8", "#ffd54f", "#4fff9d", "#4fc3ff", "#b44fff", "#ffffff"]
   };
   const colors = palettes[rarity] || palettes.N;
   const layer = document.createElement("div");
@@ -1764,7 +1931,7 @@ function gachaFX(rarity){
   flash.style.background = `radial-gradient(circle at 50% 45%, ${colors[0]}, transparent 72%)`;
   layer.appendChild(flash);
 
-  const count = rarity === "UR" ? 110 : rarity === "SR" ? 70 : rarity === "R" ? 40 : 22;
+  const count = rarity === "XR" ? 170 : rarity === "UR" ? 110 : rarity === "SR" ? 70 : rarity === "R" ? 40 : 22;
   for (let i = 0; i < count; i++){
     const c = document.createElement("span");
     c.className = "conf";
@@ -1777,9 +1944,9 @@ function gachaFX(rarity){
     layer.appendChild(c);
   }
 
-  if (rarity === "SR" || rarity === "UR"){
+  if (rarity === "SR" || rarity === "UR" || rarity === "XR"){
     const rays = document.createElement("div");
-    rays.className = "fx-rays";
+    rays.className = "fx-rays" + (rarity === "XR" ? " xr" : "");
     layer.appendChild(rays);
   }
   if (rarity === "UR"){
@@ -1788,9 +1955,20 @@ function gachaFX(rarity){
     jp.innerHTML = "UR!!<small>JACKPOT</small>";
     layer.appendChild(jp);
   }
+  if (rarity === "XR"){
+    const jp = document.createElement("div");
+    jp.className = "fx-jackpot xr";
+    jp.innerHTML = "超激レア!!<small>SUPER ULTRA RARE</small>";
+    layer.appendChild(jp);
+    const gv = document.getElementById("viewGacha");          // 画面ごと揺らす
+    if (gv){
+      gv.classList.remove("fx-shake"); void gv.offsetWidth; gv.classList.add("fx-shake");
+      setTimeout(() => gv.classList.remove("fx-shake"), 1150);
+    }
+  }
 
   document.body.appendChild(layer);
-  setTimeout(() => layer.remove(), rarity === "UR" ? 3400 : 2700);
+  setTimeout(() => layer.remove(), rarity === "XR" ? 4500 : rarity === "UR" ? 3400 : 2700);
 }
 function pullGacha(){
   if (gachaBusy) return;
@@ -1824,22 +2002,24 @@ function pullGacha(){
     let refund = 0;
     if (!isNew){ refund = DUP_REFUND[item.rarity]; eco.coins += refund; eco.totalEarned += refund; }
 
-    machine.classList.remove("rolling", "epic", "legendary");
+    machine.classList.remove("rolling", "epic", "legendary", "supreme");
     if (item.rarity === "SR") machine.classList.add("epic");
     if (item.rarity === "UR") machine.classList.add("legendary");
-    document.getElementById("gachaBall").textContent = "🎰";
-    const shiny = item.rarity === "SR" || item.rarity === "UR";
+    if (item.rarity === "XR") machine.classList.add("supreme");
+    document.getElementById("gachaBall").textContent = item.rarity === "XR" ? "🌈" : "🎰";
+    const shiny = item.rarity === "SR" || item.rarity === "UR" || item.rarity === "XR";
     result.innerHTML =
       `<div class="prize r-${item.rarity} ${isNew ? "" : "dup"}">
          ${shiny ? '<span class="shine"></span>' : ""}
          <div class="face">${item.emoji}</div>
          <div class="nm">${item.name}</div>
          <span class="rar">${RARITY_LABEL[item.rarity]}</span>
-         <div class="rar-banner b-${item.rarity}">${item.rarity} ${isNew ? "NEW GET!" : "DUP"}</div>
+         <div class="rar-banner b-${item.rarity}">${RARITY_SHORT[item.rarity]} ${isNew ? "NEW GET!" : "DUP"}</div>
          <div class="dupnote">${isNew ? "✨ 初ゲット！コレクション追加" : `duplicate… コイン返却 +${refund}`}</div>
        </div>`;
     gachaFX(item.rarity);
-    if (isNew && item.rarity === "UR") SE.play("jackpot");
+    if (item.rarity === "XR"){ SE.play("supreme"); setTimeout(() => SE.play("fanfare"), 460); rewardToast("🌈 超激レア獲得！世界に1つだけの輝き！"); }
+    else if (isNew && item.rarity === "UR") SE.play("jackpot");
     else if (isNew && item.rarity === "SR") SE.play("fanfare");
     else if (isNew) SE.play("levelup");
     else { SE.play("coin"); rewardToast(`ダブりありがとう！ +${refund}コイン`); }
@@ -1857,9 +2037,16 @@ function renderCollection(){
   const col = state.economy.collection || {};
   const ownedCount = GACHA_ITEMS.filter(i => col[i.id] > 0).length;
   document.getElementById("collCount").textContent = `${ownedCount} / ${GACHA_ITEMS.length} 種類 ／ 引いた回数 ${state.economy.pulls || 0} 回`;
+  const odds = document.getElementById("gachaOdds");
+  if (odds){
+    const parts = RARITY_WEIGHT.map(([r, w]) =>
+      r === "XR" ? `<b style="color:#ff4fd8;">超激レア ${(w*100).toFixed(0)}%</b>`
+                 : `${r} ${Math.round(w*100)}%`);
+    odds.innerHTML = "排出率: " + parts.join(" ／ ");
+  }
   box.innerHTML = GACHA_ITEMS.map(i => {
     const n = col[i.id] || 0;
-    return `<div class="item ${i.rarity} ${n ? "" : "locked"}" title="${RARITY_LABEL[i.rarity]}">
+    return `<div class="item r-${i.rarity} ${n ? "" : "locked"}" title="${RARITY_LABEL[i.rarity]}">
       ${n > 1 ? `<span class="cnt">×${n}</span>` : ""}
       <div class="face">${n ? i.emoji : "🔒"}</div>
       <div class="nm">${n ? i.name : "？？？"}</div>
@@ -1919,7 +2106,79 @@ document.getElementById("btnStartSetup").addEventListener("click", () => {
 /* =========================================================================
    8. ダッシュボード描画
    ========================================================================= */
+/* ---- 学習レベルUI（ダッシュボード） ---- */
+function renderLevelUI(){
+  const box = document.getElementById("levelChips");
+  if (!box) return;
+  const cur = getStudyLevel();
+  box.innerHTML = STUDY_LEVELS.map(l => {
+    const isCustom = l.id === "custom";
+    let count, mult, name;
+    if (isCustom){
+      // カスタムは常に「保存されているカスタム値」を表示（選択中かどうかで中身が変わらない）
+      const c = (state.settings.customStudy && typeof state.settings.customStudy === "object")
+                ? state.settings.customStudy : {};
+      count = Math.round(clampNum(c.count, 5, 30, 10));
+      mult  = Math.round(clampNum(c.mult, 1, 3, 1.05) * 100) / 100;
+      name  = (typeof c.name === "string" && c.name.trim()) ? c.name.trim().slice(0, 10) : "マイペース";
+    }else{
+      count = l.count; mult = l.mult; name = l.name;
+    }
+    return `<button type="button" class="level-chip ${cur.id === l.id ? "on" : ""}" data-lv="${l.id}">
+      <span class="lv">${l.badge}${l.id === "lv3" ? '<i class="rec">★おすすめ</i>' : ""}</span>
+      <span class="nm">${escapeHtml(name)}</span>
+      <span class="sp">${count}問 ・ コイン×${Number(mult).toFixed(2)}</span>
+      <span class="note">${l.note}</span>
+    </button>`;
+  }).join("");
+  box.querySelectorAll(".level-chip").forEach(b =>
+    b.addEventListener("click", () => setStudyLevel(b.dataset.lv)));
+
+  const panel = document.getElementById("customLevelBox");
+  panel.classList.toggle("hidden", cur.id !== "custom");
+  const nameIn = document.getElementById("lvCustomName");
+  const cntIn  = document.getElementById("lvCountRange");
+  const mulIn  = document.getElementById("lvMultRange");
+  if (document.activeElement !== nameIn) nameIn.value = cur.name;
+  if (document.activeElement !== cntIn)  cntIn.value  = cur.count;
+  if (document.activeElement !== mulIn)  mulIn.value  = cur.mult;
+  document.getElementById("lvCountVal").textContent = cur.count;
+  document.getElementById("lvMultVal").textContent  = "×" + cur.mult.toFixed(2);
+}
+function setStudyLevel(id){
+  state.settings.studyLevel = STUDY_LEVELS.some(l => l.id === id) ? id : "lv3";
+  saveState();
+  SE.play("click");
+  const lv = getStudyLevel();
+  renderLevelUI();
+  renderHome();
+  toast(`学習レベル ${lv.badge}「${lv.name}」：1回 ${lv.count}問 ・ コイン×${lv.mult.toFixed(2)}〜`);
+}
+/** カスタムレベルの値を保存（スライダー連動・入力中も画面を壊さない） */
+function updateCustomLevel(applyUI){
+  const c = (state.settings.customStudy && typeof state.settings.customStudy === "object")
+            ? state.settings.customStudy : (state.settings.customStudy = {});
+  const nameIn = document.getElementById("lvCustomName");
+  const cntIn  = document.getElementById("lvCountRange");
+  const mulIn  = document.getElementById("lvMultRange");
+  c.name  = (nameIn.value || "").trim().slice(0, 10) || "マイペース";
+  c.count = Math.round(clampNum(cntIn.value, 5, 30, 10));
+  c.mult  = Math.round(clampNum(mulIn.value, 1, 3, 1.05) * 100) / 100;
+  state.settings.studyLevel = "custom";
+  document.getElementById("lvCountVal").textContent = c.count;
+  document.getElementById("lvMultVal").textContent  = "×" + c.mult.toFixed(2);
+  saveState();
+  renderHome();
+  if (applyUI){ renderLevelUI(); toast(`カスタムレベル：1回 ${c.count}問 ・ コイン×${c.mult.toFixed(2)}〜`); }
+}
+document.getElementById("lvCountRange").addEventListener("input", () => updateCustomLevel(false));
+document.getElementById("lvMultRange").addEventListener("input",  () => updateCustomLevel(false));
+document.getElementById("lvCountRange").addEventListener("change", () => updateCustomLevel(true));
+document.getElementById("lvMultRange").addEventListener("change",  () => updateCustomLevel(true));
+document.getElementById("lvCustomName").addEventListener("change", () => updateCustomLevel(true));
+
 function renderHome(){
+  renderLevelUI();
   const s = stats();
   const left = daysLeft();
 
@@ -1930,8 +2189,10 @@ function renderHome(){
     fmtDate(state.settings.examDate) + " がテスト日（残り " + left + " 日）";
 
   const queue = buildQueue();
-  const newInQueue = queue.filter(id => !state.progress[id].seen).length;
-  const reviewInQueue = queue.length - newInQueue;
+  const lv = getStudyLevel();
+  const planQueue = queue.slice(0, lv.count);          // 1回に出るのは学習レベルの問題数ぶん
+  const newInQueue = planQueue.filter(id => !state.progress[id].seen).length;
+  const reviewInQueue = planQueue.length - newInQueue;
 
   document.getElementById("planReview").textContent = reviewInQueue;
   document.getElementById("planNew").textContent = newInQueue;
@@ -1951,11 +2212,12 @@ function renderHome(){
   box.classList.toggle("done", m.done);
 
   const h = state.history[todayISO()];
-  document.getElementById("todayPlanText").textContent = queue.length
-    ? `復習 ${reviewInQueue} 問 ＋ 新規 ${newInQueue} 問 ＝ 全 ${queue.length} 問（今日 ${h ? h.answered : 0} 問解済）`
+  document.getElementById("todayPlanText").textContent = planQueue.length
+    ? `復習 ${reviewInQueue} 問 ＋ 新規 ${newInQueue} 問 ＝ 1回 ${planQueue.length} 問（${lv.badge}「${lv.name}」・コイン×${lv.mult.toFixed(2)}）`
     : (h ? `今日の復習はすべて完了！ 追い込み学習もできます。` : `今日の復習はありません（次の復習日まで待機）`);
 
   document.getElementById("btnStartStudy").disabled = queue.length === 0;
+  document.getElementById("btnCram").textContent = `💪 苦手だけ追い込み学習（${lv.count}問）`;
 
   // 教科別バー
   const subjects = [...new Set(QUESTIONS.map(q => q.subject))];
@@ -1976,13 +2238,13 @@ function renderHome(){
 
   // キュープレビュー
   const qp = document.getElementById("queuePreview");
-  if (!queue.length){ qp.textContent = "今日は出題予定の問題がありません。"; }
+  if (!planQueue.length){ qp.textContent = "今日は出題予定の問題がありません。"; }
   else {
-    qp.innerHTML = queue.slice(0, 12).map((id,i) => {
+    qp.innerHTML = planQueue.slice(0, 12).map((id,i) => {
       const q = QUESTIONS.find(x => x.id === id);
       const isNew = !state.progress[id].seen;
       return `<span class="chip" style="margin:3px 6px 3px 0;">${i+1}. ${q.subject}・${q.unit}${isNew ? "（新規）" : ""}</span>`;
-    }).join("") + (queue.length > 12 ? ` <span class="muted">…ほか ${queue.length-12} 問</span>` : "");
+    }).join("") + (planQueue.length > 12 ? ` <span class="muted">…ほか ${planQueue.length-12} 問</span>` : "");
   }
 
   // 問題一覧
@@ -2051,8 +2313,10 @@ function escapeHtml(s){
 let session = null;
 
 function startSession(queue, mode){
-  if (!queue.length){ toast("今日の出題予定がありません"); return; }
-  session = { queue: queue.slice(), idx:0, judged:false, revealed:false,
+  const cap = getStudyLevel().count;              // 学習レベルの問題数ぶんだけ出題（1回あたり）
+  const qs = queue.slice(0, cap);
+  if (!qs.length){ toast("今日の出題予定がありません"); return; }
+  session = { queue: qs, idx:0, judged:false, revealed:false,
               chosen:null, isCorrect:false, correct:0, wrong:0,
               upgrades:0, reps:{}, mode: mode || "normal", coins:0 };
   showView("study");
@@ -2077,6 +2341,7 @@ function renderCard(){
   document.getElementById("qUnit").textContent = "単元: " + q.unit;
   document.getElementById("qLevelTag").textContent = "定着度 " + p.level + "/3" +
     (p.seen ? "・次回復習 " + fmtDate(p.nextReview) : "・新規");
+  updateLvTag();
   document.getElementById("qText").textContent = q.question;
   document.getElementById("frontHint").textContent = q.choices.length
     ? "頭の中で答えを思い出してから選択しよう"
@@ -2159,7 +2424,7 @@ function judge(isCorrect){
   if (state.progress[q.id].level > before) session.upgrades++;
   if (state.progress[q.id].level === 3 && before < 3){
     SE.play("levelup");
-    addCoins(20, "🏅 レベル3 完璧定着！");   // 着実にレベルアップするごとにご褒美
+    addCoins(coinGain(20), "🏅 レベル3 完璧定着！");   // 着実にレベルアップするごとにご褒美（倍率適用）
   }else{
     SE.play(isCorrect ? "correct" : "wrong");
   }
@@ -2191,12 +2456,19 @@ function judge(isCorrect){
 }
 
 function nextCard(){
-  if (!session || !session.judged) return;
+  if (!session || !session.judged || session.finished) return;
   session.idx++;
   if (session.idx >= session.queue.length) return finishSession();
   renderCard();
 }
 
+/** 学習画面のレベル・コイン倍率タグ（5問ごとに倍率が上がる） */
+function updateLvTag(){
+  const el = document.getElementById("lvTag");
+  if (!el) return;
+  const lv = getStudyLevel();
+  el.textContent = `${lv.badge} ${lv.name} ・ コイン×${currentCoinMult().toFixed(2)}`;
+}
 function updateControls(){
   const reveal_ = document.getElementById("btnReveal");
   const wrong = document.getElementById("btnWrong");
@@ -2207,6 +2479,7 @@ function updateControls(){
   right.disabled = !session || session.judged;
   next.disabled = !session || !session.judged;
   if (session) renderProgressOnly();
+  updateLvTag();   // 5問解くごとに倍率が増えるので毎回更新
 }
 
 function renderProgressOnly(){
@@ -2216,13 +2489,15 @@ function renderProgressOnly(){
 }
 
 function finishSession(){
+  if (session && session.finished) return;   // 報酬の二重付与を防ぐ（コイン増殖ガード）
+  if (session) session.finished = true;
   const total = session.queue.length;
   const solved = session.correct + session.wrong;
   const acc = solved ? Math.round(session.correct / solved * 100) : 0;
 
   /* ---- 報酬：学習クリアボーナス + デイリーボーナス + ミッション確認 ---- */
   if (solved > 0){
-    addCoins(REWARD.clear, "✅ 学習クリア");
+    addCoins(coinGain(REWARD.clear), "✅ 学習クリア");
     const daily = grantDailyBonus();
     if (daily > 0) addCoins(daily, `📅 連続学習 ${state.economy.streak} 日目`);
     checkMission();
@@ -2387,7 +2662,8 @@ function sanitizeCustom(list){
 /** バックアップ内容で state をまるごと置き換える（欠損は既定値、壊れた値は破棄） */
 function restoreFullState(saved){
   const s = (saved.settings && typeof saved.settings === "object") ? saved.settings : {};
-  state.settings = Object.assign({ started:false, days:7, examDate:null, se:true, subjectFilter:[] }, s);
+  state.settings = Object.assign({ started:false, days:7, examDate:null, se:true, subjectFilter:[],
+                                   studyLevel:"lv3", customStudy:{ name:"マイペース", count:10, mult:1.05 } }, s);
   if (typeof state.settings.started !== "boolean") state.settings.started = false;
   if (typeof state.settings.se !== "boolean") state.settings.se = true;
   if (!Array.isArray(state.settings.subjectFilter)) state.settings.subjectFilter = [];
