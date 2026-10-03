@@ -130,6 +130,13 @@
   .range-labels{display:flex; justify-content:space-between; color:var(--muted); font-size:.85rem; font-weight:700;}
   .noexam-row{display:flex; align-items:center; gap:9px; margin-top:12px; font-weight:800; font-size:.92rem; cursor:pointer;}
   .noexam-row input[type=checkbox]{width:19px; height:19px; accent-color:var(--accent); cursor:pointer; flex:none;}
+  /* 教科ごとの絞り込みは非効率という警告（機能制限はしない・注意書きのみ） */
+  .subject-warn{
+    margin-top:10px; padding:9px 12px; border-radius:10px;
+    font-weight:800; font-size:.86rem; line-height:1.5;
+    background:rgba(255,176,32,.14); border:1px solid rgba(255,176,32,.5); color:#c77b00;
+  }
+  [data-theme="dark"] .subject-warn{ color:#ffb84d; }
   .feature-list{list-style:none; padding:0; margin:22px 0; display:grid; gap:10px;}
   .feature-list li{
     display:flex; gap:12px; align-items:flex-start;
@@ -851,14 +858,14 @@
       </div>
     </div>
 
-    <h2 class="section-title">学習レベル（1回の問題数とコイン倍率）</h2>
+    <h2 class="section-title">学習レベル（コイン倍率・追い込み学習の問題数）</h2>
     <div class="card-surface" style="padding:14px 16px;">
       <div class="level-chips" id="levelChips"></div>
       <div id="customLevelBox" class="hidden" style="margin-top:12px; display:grid; gap:12px;">
         <div class="row2">
           <div class="field"><label for="lvCustomName">レベル名</label>
             <input type="text" id="lvCustomName" maxlength="10" placeholder="マイペース"></div>
-          <div class="field"><label for="lvCountRange">1回の問題数 <b id="lvCountVal">10</b> 問（5〜30）</label>
+          <div class="field"><label for="lvCountRange">コイン倍率の基準問題数 <b id="lvCountVal">10</b> 問（5〜30）</label>
             <input type="range" id="lvCountRange" min="5" max="30" step="1" value="10" aria-label="問題数"></div>
         </div>
         <div class="muted" style="font-size:.86rem; font-weight:800;">
@@ -866,7 +873,8 @@
         </div>
       </div>
       <div class="muted" style="font-size:.85rem; font-weight:700; margin-top:10px;">
-        💡 <b>コイン倍率は問題数に比例</b>（5問=×1.05、10問=×1.10、15問=×1.16、20問=×1.22）。迷ったら <b>Lv3「まじめ」</b>がおすすめ！
+        💡 <b>コイン倍率は問題数に比例</b>（5問=×1.05、10問=×1.10、15問=×1.16、20問=×1.22）。迷ったら <b>Lv3「まじめ」</b>がおすすめ！<br>
+        ▶ 学習は<b>出題キューをぜんぶ出すので制限なし</b>。この問題数はコイン倍率と「追い込み学習」の出題数の基準です。
       </div>
     </div>
 
@@ -875,6 +883,9 @@
       <div class="subject-chips" id="subjectChips"></div>
       <div class="muted" style="font-size:.85rem; font-weight:700; margin-top:9px;">
         タップで ON/OFF。選んだ教科だけが出題キューに入ります（複数選択OK）。
+      </div>
+      <div id="subjectWarn" class="subject-warn hidden">
+        ⚠️ 教科ごとに制限すると、ほかの教科の復習が滞って<b>非効率</b>です。全教科をまぜて出すのがおすすめ！
       </div>
     </div>
 
@@ -1622,6 +1633,16 @@ function buildCramQueue(){
     .map(q => q.id);
 }
 
+/** 自由練習キュー（出題予定がなくても学習できる：全問題を定着度の低い順に） */
+function freePracticeQueue(){
+  const f = subjectsInPlay();
+  return QUESTIONS
+    .filter(q => !f || f.includes(q.subject))
+    .slice()
+    .sort((a,b) => priority(b) - priority(a))
+    .map(q => q.id);
+}
+
 /** 回答を適用して Leitner ボックスを更新 */
 function applyAnswer(id, isCorrect){
   const p = state.progress[id];
@@ -1767,7 +1788,8 @@ const SE = (function(){
    ========================================================================= */
 const REWARD = { correct:10, wrong:1, clear:30, mission:100, dailyBase:30, dailyStep:10, dailyCap:120 };
 
-/* ---- 学習レベル（1回の問題数を決める／Lv3 が既定の推奨設定） ----
+/* ---- 学習レベル（コイン倍率の基準問題数と追い込み学習の問題数を決める／Lv3 が既定の推奨設定） ----
+   ※ 学習セッション自体は出題キューをぜんぶ出す（レベルで切りない・制限なし）。
    ※ 保存は settings.studyLevel（ID文字列）と settings.customStudy のみ。
      旧セーブに無い場合は必ず lv3 にフォールバックする（データ非破壊）。
    ※ コイン倍率は「問題数に比例」して自動計算（レベルで直接指定しない）。 */
@@ -2166,7 +2188,7 @@ function setStudyLevel(id){
   const lv = getStudyLevel();
   renderLevelUI();
   renderHome();
-  toast(`学習レベル ${lv.badge}「${lv.name}」：1回 ${lv.count}問 ・ コイン×${lv.mult.toFixed(2)}〜`);
+  toast(`学習レベル ${lv.badge}「${lv.name}」：コイン×${lv.mult.toFixed(2)} ・ 追い込み ${lv.count}問（学習自体はぜんぶ出題）`);
 }
 /** カスタムレベルの値を保存（スライダー連動・入力中も画面を壊さない） */
 function updateCustomLevel(applyUI){
@@ -2204,7 +2226,7 @@ function renderHome(){
 
   const queue = buildQueue();
   const lv = getStudyLevel();
-  const planQueue = queue.slice(0, lv.count);          // 1回に出るのは学習レベルの問題数ぶん
+  const planQueue = queue;                             // 制限なし：出題キューをぜんぶ（学習レベルで切らない）
   const newInQueue = planQueue.filter(id => !state.progress[id].seen).length;
   const reviewInQueue = planQueue.length - newInQueue;
 
@@ -2227,10 +2249,16 @@ function renderHome(){
 
   const h = state.history[todayISO()];
   document.getElementById("todayPlanText").textContent = planQueue.length
-    ? `復習 ${reviewInQueue} 問 ＋ 新規 ${newInQueue} 問 ＝ 1回 ${planQueue.length} 問（${lv.badge}「${lv.name}」・コイン×${lv.mult.toFixed(2)}）`
-    : (h ? `今日の復習はすべて完了！ 追い込み学習もできます。` : `今日の復習はありません（次の復習日まで待機）`);
+    ? `復習 ${reviewInQueue} 問 ＋ 新規 ${newInQueue} 問 ＝ ぜんぶ ${planQueue.length} 問（${lv.badge}「${lv.name}」・コイン×${lv.mult.toFixed(2)}）`
+    : (h ? `今日の復習はすべて完了！ 🔁 自由練習でぜんぶ ${freePracticeQueue().length} 問もう一回できます。`
+         : `出題予定なし ＋ 🔁 自由練習（ぜんぶ ${freePracticeQueue().length} 問）でも学習できます`);
 
-  document.getElementById("btnStartStudy").disabled = queue.length === 0;
+  /* 学習開始の制限なし：出題予定がなくても自由練習として開始できる */
+  const btnStart = document.getElementById("btnStartStudy");
+  btnStart.disabled = false;
+  btnStart.textContent = planQueue.length
+    ? "▶ 今日の学習をはじめる"
+    : `🔁 自由練習をはじめる（ぜんぶ ${freePracticeQueue().length} 問）`;
   document.getElementById("btnCram").textContent = `💪 苦手だけ追い込み学習（${lv.count}問）`;
 
   // 教科別バー
@@ -2252,7 +2280,7 @@ function renderHome(){
 
   // キュープレビュー
   const qp = document.getElementById("queuePreview");
-  if (!planQueue.length){ qp.textContent = "今日は出題予定の問題がありません。"; }
+  if (!planQueue.length){ qp.textContent = `出題予定なし（自由練習ならぜんぶ ${freePracticeQueue().length} 問から出ます）`; }
   else {
     qp.innerHTML = planQueue.slice(0, 12).map((id,i) => {
       const q = QUESTIONS.find(x => x.id === id);
@@ -2289,9 +2317,13 @@ function renderSubjectChips(){
   box.innerHTML =
     `<button class="subject-chip ${allOn ? "on" : ""}" data-s="__all__">🌟 すべて</button>` +
     subs.map(s => `<button class="subject-chip ${f.includes(s) ? "on" : ""}" data-s="${escapeHtml(s)}">${escapeHtml(s)}</button>`).join("");
+  /* 教科ごとの絞り込み中は「非効率」警告を表示（注意書きだけで機能制限はしない） */
+  const warn = document.getElementById("subjectWarn");
+  if (warn) warn.classList.toggle("hidden", allOn);
   box.querySelectorAll(".subject-chip").forEach(b => b.addEventListener("click", () => {
     const s = b.dataset.s;
     let next = [...(state.settings.subjectFilter || [])];
+    const wasAll = next.length === 0;
     if (s === "__all__"){
       next = [];
     }else{
@@ -2302,6 +2334,7 @@ function renderSubjectChips(){
     state.settings.subjectFilter = next;
     saveState();
     SE.play("click");
+    if (wasAll && next.length) toast("⚠️ 教科ごとの絞り込みは非効率です（他の教科の復習が滞ります）");
     renderHome();
   }));
 }
@@ -2327,9 +2360,11 @@ function escapeHtml(s){
 let session = null;
 
 function startSession(queue, mode){
-  const cap = getStudyLevel().count;              // 学習レベルの問題数ぶんだけ出題（1回あたり）
-  const qs = queue.slice(0, cap);
-  if (!qs.length){ toast("今日の出題予定がありません"); return; }
+  /* 通常学習は無制限＝出題キューをぜんぶ出す（レベルの問題数で切らない）。
+     追い込み学習のみレベル設定の問題数ぶんだけ。 */
+  const isCram = (mode === "cram");
+  const qs = isCram ? queue.slice(0, getStudyLevel().count) : queue;
+  if (!qs.length){ toast(isCram ? "追い込める問題がありません（定着済みですね🎉）" : "出す問題がありません"); return; }
   session = { queue: qs, idx:0, judged:false, revealed:false,
               chosen:null, isCorrect:false, correct:0, wrong:0,
               upgrades:0, reps:{}, mode: mode || "normal", coins:0 };
@@ -2530,8 +2565,10 @@ function finishSession(){
   document.getElementById("doneUp").textContent = session.upgrades;
   const again = document.getElementById("btnAgain");
   const leftover = buildQueue();
-  again.disabled = leftover.length === 0;
-  again.textContent = leftover.length ? `🔁 苦手をもう一周する（${leftover.length} 問）` : "🎉 今日の復習はすべて完了！";
+  again.disabled = false;                          // 制限なし：出題予定がなくても自由練習を続けられる
+  again.textContent = leftover.length
+    ? `🔁 苦手をもう一周する（${leftover.length} 問）`
+    : `🔁 自由練習をはじめる（ぜんぶ ${freePracticeQueue().length} 問）`;
   saveState();
   showView("done");
 }
@@ -2547,11 +2584,19 @@ document.getElementById("btnQuit").addEventListener("click", () => {
 });
 function blur(){ if (document.activeElement && document.activeElement.blur) document.activeElement.blur(); }
 
-document.getElementById("btnStartStudy").addEventListener("click", () => startSession(buildQueue(), "normal"));
+/* 学習開始＝制限なし。出題予定があればキューぜんぶ、無ければ自由練習（全問題） */
+document.getElementById("btnStartStudy").addEventListener("click", () => {
+  const q = buildQueue();
+  startSession(q.length ? q : freePracticeQueue(), "normal");
+});
 document.getElementById("btnCram").addEventListener("click", () => startSession(buildCramQueue(), "cram"));
 document.getElementById("btnBackHome").addEventListener("click", () => { session = null; showView("home"); });
 document.getElementById("btnGachaDone").addEventListener("click", () => { session = null; showView("gacha"); });
-document.getElementById("btnAgain").addEventListener("click", () => { session = null; startSession(buildQueue(), "normal"); });
+document.getElementById("btnAgain").addEventListener("click", () => {
+  session = null;
+  const q = buildQueue();
+  startSession(q.length ? q : freePracticeQueue(), "normal");
+});
 document.getElementById("btnEditDays").addEventListener("click", () => showView("setup"));
 document.getElementById("btnReset").addEventListener("click", async () => {
   const ok = await confirmDialog({
