@@ -990,6 +990,7 @@
       <div style="display:grid; gap:12px;">
         <button class="btn primary lg block" id="btnBackHome">ダッシュボードへ</button>
         <button class="btn block" id="btnAgain">🔁 苦手をもう一周する</button>
+        <button class="btn block" id="btnDoneAi">🤖 間違えた問題をAI用にコピー</button>
         <button class="btn block" id="btnGachaDone">🎰 得たコインでガチャを引く</button>
       </div>
     </div>
@@ -1221,6 +1222,8 @@
     <div class="toolbar">
       <button class="btn ghost" id="btnStatsBack">← ダッシュボードへ</button>
       <button class="btn" id="btnStatsCsv">📋 表をCSVコピー</button>
+      <button class="btn" id="btnStatsAi">🤖 間違えた問題をAI用コピー</button>
+      <button class="btn" id="btnStatsAiSave">⬇ 間違えた問題を.md保存</button>
       <span class="muted" style="font-weight:800; font-size:.9rem;">ショートカット：S で開閉 / Esc で戻る</span>
     </div>
 
@@ -1272,7 +1275,7 @@
     <div class="card-surface" style="padding:0;">
       <div class="tbl-wrap" id="qTable"></div>
     </div>
-    <div class="tbl-note">「教科・単元・問題・解答数・正答率・レベル・次回復習」で並べ替え可能。上の検索欄で絞り込めます。</div>
+    <div class="tbl-note">「教科・単元・問題・解答数・正答率・レベル・次回復習」で並べ替え可能。上の検索欄で絞り込めます。<br>🤖「間違えた問題をAI用コピー」で、間違えた問題をそのままAIに貼り付けて質問できる形式で書き出せます。</div>
   </section>
 
 <div class="modal hidden" id="helpModal">
@@ -2368,6 +2371,7 @@ function startSession(queue, mode){
   session = { queue: qs, idx:0, judged:false, revealed:false,
               chosen:null, isCorrect:false, correct:0, wrong:0,
               upgrades:0, reps:{}, mode: mode || "normal", coins:0,
+              wrongIds:[],                          // 今回のセッションで間違えた問題（AI用エクスポート）
               choiceOrder:null, answerPos:null };   // 選択肢の毎回シャッフル用
   showView("study");
   renderCard();
@@ -2508,6 +2512,7 @@ function judge(isCorrect){
   // 不正解は同セッション内で後ろに再出題（最大2回まで）
   if (!isCorrect){
     const key = q.id;
+    if (!session.wrongIds.includes(key)) session.wrongIds.push(key);   // AI用エクスポートに記録
     const reps = session.reps[key] = (session.reps[key] || 0) + 1;
     if (reps <= 2 && !session.queue.slice(session.idx + 1).includes(key)){
       session.queue.push(key);   // 同じセッション内でもう一度出題
@@ -2584,6 +2589,13 @@ function finishSession(){
   again.textContent = leftover.length
     ? `🔁 苦手をもう一周する（${leftover.length} 問）`
     : `🔁 自由練習をはじめる（ぜんぶ ${freePracticeQueue().length} 問）`;
+  // 今回のセッションで間違えた問題は、その場でAI用に書き出せる
+  const wrongN = (session.wrongIds || []).length;
+  const doneAi = document.getElementById("btnDoneAi");
+  doneAi.disabled = wrongN === 0;
+  doneAi.textContent = wrongN
+    ? `🤖 間違えた問題（${wrongN} 問）をAI用にコピー`
+    : "🎉 今回のセッションは間違えた問題なし";
   saveState();
   showView("done");
 }
@@ -2611,6 +2623,11 @@ document.getElementById("btnAgain").addEventListener("click", () => {
   session = null;
   const q = buildQueue();
   startSession(q.length ? q : freePracticeQueue(), "normal");
+});
+/* 今回のセッションで間違えた問題を、その場でAI用にコピー */
+document.getElementById("btnDoneAi").addEventListener("click", () => {
+  const ids = (session && session.wrongIds) ? session.wrongIds : [];
+  copyWrongAi(rowsFromIds(ids), "今回の学習セッション");
 });
 document.getElementById("btnEditDays").addEventListener("click", () => showView("setup"));
 document.getElementById("btnReset").addEventListener("click", async () => {
@@ -3585,6 +3602,84 @@ function statsRows(){
     });
 }
 
+/* ---- 間違えた問題のAI用エクスポート（貼り付けるだけで質問できる形式） ---- */
+/** 行データから「間違えたことのある問題」だけを取り出す（間違え回数の多い順） */
+function wrongRows(rows){
+  return rows.filter(r => r.p && r.p.wrong > 0)
+             .sort((a,b) => b.p.wrong - a.p.wrong || a.p.level - b.p.level);
+}
+/** 問題IDの配列を statsRows() と同じ形の行データに変換（お疲れ画面用） */
+function rowsFromIds(ids){
+  return ids.map(id => {
+    const q = QUESTIONS.find(x => x.id === id);
+    const p = state.progress[id];
+    if (!q || !p) return null;
+    const answered = p.correct + p.wrong;
+    return { q, p, answered,
+             acc: answered ? p.correct / answered : null,
+             accPct: answered ? Math.round(p.correct / answered * 100) : null,
+             level: p.level, next: p.seen ? p.nextReview : null };
+  }).filter(Boolean);
+}
+/** 現在の絞り込み（教科・検索）をプロンプト用のメモにする */
+function aiScopeNote(){
+  const bits = [];
+  if (statsUI.subject && statsUI.subject !== "__all__") bits.push("教科: " + statsUI.subject);
+  if (statsUI.search && statsUI.search.trim()) bits.push("検索: " + statsUI.search.trim());
+  return bits.length ? bits.join("・") : null;
+}
+/** AIに貼り付けるための質問用プロンプト（間違えた問題つき）を組み立てる */
+function buildWrongPrompt(list, scopeNote){
+  const exam = (!state.settings.noExam && state.settings.examDate)
+    ? fmtDate(state.settings.examDate) + "（残り " + daysLeft() + " 日）"
+    : "テスト日なし（いつでも学習モード）";
+  const out = [];
+  out.push("あなたは中学生の先生です。以下は私が間違えた問題です。");
+  out.push("1問ずつ、【① よく間違える理由】【② 正しい考え方・解き方】【③ 覚えるポイント】の順で、中学レベルでやさしく解説してください。");
+  out.push("最後に、同じ単元から似た問題を1問ずつ出題してください。");
+  out.push("");
+  out.push("■ データ");
+  out.push("・エクスポート日: " + todayISO());
+  out.push("・テスト日: " + exam);
+  out.push("・間違えた問題: " + list.length + "問" + (scopeNote ? "（" + scopeNote + "）" : ""));
+  out.push("");
+  list.forEach((r, i) => {
+    const q = r.q, p = r.p;
+    out.push("── 問題 " + (i+1) + " ［" + q.subject + "］単元: " + q.unit);
+    out.push("問: " + q.question);
+    if (q.choices.length){
+      out.push("選択肢:");
+      q.choices.forEach((c, ci) => out.push("  " + (ci+1) + ". " + c + (ci === q.answer ? "（正解）" : "")));
+    }
+    out.push("正解: " + (q.choices.length ? q.choices[q.answer] : q.answer));
+    if (q.explain) out.push("解説メモ: " + q.explain);
+    out.push("私の記録: 間違え " + p.wrong + " 回 ／ 正答率 " + (r.accPct == null ? "—" : r.accPct + "%") +
+             "（正 " + p.correct + " 回・不正 " + p.wrong + " 回） ／ 定着度 L" + p.level);
+    out.push("");
+  });
+  return out.join("\n");
+}
+/** 間違えた問題をクリップボードへ（AIチャットに貼り付けて質問する用） */
+async function copyWrongAi(rows, scopeNote){
+  if (!rows.length){ toast("間違えた問題はありません🎉"); return false; }
+  const ok = await copyText(buildWrongPrompt(rows, scopeNote));
+  if (ok){ SE.play("coin"); toast(`🤖 ${rows.length} 問をAI用にコピーしました。AIチャットに貼り付けて質問しよう！`); }
+  else toast("コピーに失敗しました");
+  return ok;
+}
+/** 間違えた問題を .md ファイルとして保存（ダウンロード） */
+function saveWrongAi(rows, scopeNote){
+  if (!rows.length){ toast("間違えた問題はありません🎉"); return; }
+  const blob = new Blob([buildWrongPrompt(rows, scopeNote)], { type:"text/markdown;charset=utf-8" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "gakufu-wrong-questions-" + todayISO() + ".md";
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  SE.play("coin");
+  toast(`⬇ 間違えた ${rows.length} 問を .md で保存しました`);
+}
+
 function groupAgg(rows, keyFn){
   const map = new Map();
   for (const r of rows){
@@ -3872,6 +3967,13 @@ document.getElementById("btnStatsCsv").addEventListener("click", async () => {
   const ok = await copyText("\uFEFF" + lines.join("\r\n"));   // BOM付き（Excelでも文字化けしない）
   if (ok){ SE.play("coin"); toast(`📋 ${lastQRows.length} 問をCSVでコピーしました`); }
   else toast("コピーに失敗しました");
+});
+/* 間違えた問題のAI用エクスポート（いま表示している表＝教科・検索の絞り込みがそのまま反映される） */
+document.getElementById("btnStatsAi").addEventListener("click", () => {
+  copyWrongAi(wrongRows(lastQRows), aiScopeNote());
+});
+document.getElementById("btnStatsAiSave").addEventListener("click", () => {
+  saveWrongAi(wrongRows(lastQRows), aiScopeNote());
 });
 
 /* =========================================================================
