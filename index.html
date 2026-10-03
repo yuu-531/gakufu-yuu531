@@ -128,6 +128,8 @@
     width:100%; margin:22px 0 6px; accent-color:var(--accent); height:34px;
   }
   .range-labels{display:flex; justify-content:space-between; color:var(--muted); font-size:.85rem; font-weight:700;}
+  .noexam-row{display:flex; align-items:center; gap:9px; margin-top:12px; font-weight:800; font-size:.92rem; cursor:pointer;}
+  .noexam-row input[type=checkbox]{width:19px; height:19px; accent-color:var(--accent); cursor:pointer; flex:none;}
   .feature-list{list-style:none; padding:0; margin:22px 0; display:grid; gap:10px;}
   .feature-list li{
     display:flex; gap:12px; align-items:flex-start;
@@ -804,6 +806,9 @@
         <div class="days-date" id="daysDate">テスト日: ----/--/--</div>
         <input type="range" id="daysRange" min="1" max="14" value="7" step="1" aria-label="残り日数">
         <div class="range-labels"><span>1日</span><span>7日</span><span>14日</span></div>
+        <label class="noexam-row" for="noExamChk">
+          <input type="checkbox" id="noExamChk"> 📅 テスト日なしで学習する（いつでも学習モード）
+        </label>
       </div>
 
       <ul class="feature-list">
@@ -825,7 +830,7 @@
           <div class="ring-label"><b id="ringPct">0%</b><small>全体定着度</small></div>
         </div>
         <div class="hero-info">
-          <p class="days-left">テストまで <b id="homeDaysLeft">7</b> 日</p>
+          <p class="days-left" id="homeDaysLine">テストまで <b id="homeDaysLeft">7</b> 日</p>
           <div class="muted" id="homeExamDate">----/--/-- がテスト日</div>
           <div class="plan">
             <span class="chip warndot"><span class="dot"></span>今日の復習 <b id="planReview">0</b>問</span>
@@ -853,14 +858,15 @@
         <div class="row2">
           <div class="field"><label for="lvCustomName">レベル名</label>
             <input type="text" id="lvCustomName" maxlength="10" placeholder="マイペース"></div>
-          <div class="field"><label for="lvMultRange">コイン倍率 <b id="lvMultVal">×1.05</b>（1.00〜3.00）</label>
-            <input type="range" id="lvMultRange" min="1" max="3" step="0.05" value="1.05" aria-label="コイン倍率"></div>
+          <div class="field"><label for="lvCountRange">1回の問題数 <b id="lvCountVal">10</b> 問（5〜30）</label>
+            <input type="range" id="lvCountRange" min="5" max="30" step="1" value="10" aria-label="問題数"></div>
         </div>
-        <div class="field"><label for="lvCountRange">1回の問題数 <b id="lvCountVal">10</b> 問（5〜30）</label>
-          <input type="range" id="lvCountRange" min="5" max="30" step="1" value="10" aria-label="問題数"></div>
+        <div class="muted" style="font-size:.86rem; font-weight:800;">
+          ⚡ コイン倍率 <b id="lvMultVal">×1.10</b>（問題数から自動計算：5問ごとに ×1.05 を乗算）
+        </div>
       </div>
       <div class="muted" style="font-size:.85rem; font-weight:700; margin-top:10px;">
-        💡 <b>5問解くごとにコイン倍率が ×1.05</b> されます（レベルの倍率と掛け算で成長）。迷ったら <b>Lv3「まじめ」</b>がおすすめ！
+        💡 <b>コイン倍率は問題数に比例</b>（5問=×1.05、10問=×1.10、15問=×1.16、20問=×1.22）。迷ったら <b>Lv3「まじめ」</b>がおすすめ！
       </div>
     </div>
 
@@ -890,7 +896,7 @@
         <div class="mission-bar"><i id="missionBar" style="width:0"></i></div>
         <div class="reward-rules">
           <span>⭕ 正解 +10</span><span>❌ 不正解 +1</span><span>✅ 学習クリア +30</span>
-          <span>⚡ 5問ごとに ×1.05</span>
+          <span>⚡ 倍率は問題数比例（5問ごと×1.05）</span>
           <span>📅 デイリー連続 +30〜</span><span>🔁 連続学習でステークUP</span>
         </div>
       </div>
@@ -1407,7 +1413,7 @@ const COOKIE_PREFIX = "gakufu_";        // Cookie自動セーブ用プレフィ�
 const COOKIE_DAYS   = 365;              // Cookie有効期限（日）
 
 let state = {
-  settings: { started:false, days:7, examDate:null, se:true, subjectFilter:[],
+  settings: { started:false, days:7, examDate:null, noExam:false, se:true, subjectFilter:[],
               studyLevel:"lv3", customStudy:{ name:"マイペース", count:10, mult:1.05 } },   // 学習レベル（旧データに無ければ lv3 が既定）
   progress: {},   // id -> { level, nextReview, seen, correct, wrong }
   history:  {},   // "YYYY-MM-DD" -> { answered, correct }
@@ -1592,8 +1598,7 @@ function buildQueue(subjectsOverride){
   due.sort((a,b) => priority(b) - priority(a));
   fresh.sort((a,b) => priority(b) - priority(a));
 
-  const quota = fresh.length ? Math.max(1, Math.ceil(fresh.length / Math.max(1, daysLeft()))) : 0;
-  const news = fresh.slice(0, quota);
+  const news = fresh;                        // 1日の学習上限なし：新規問題は毎日ぜんぶ出題対象
 
   // 復習の間隔ごとに新規を 1 問ずつ挿入
   const queue = [];
@@ -1762,20 +1767,26 @@ const SE = (function(){
    ========================================================================= */
 const REWARD = { correct:10, wrong:1, clear:30, mission:100, dailyBase:30, dailyStep:10, dailyCap:120 };
 
-/* ---- 学習レベル（1回の問題数とコイン倍率を変更／Lv3 が既定の推奨設定） ----
+/* ---- 学習レベル（1回の問題数を決める／Lv3 が既定の推奨設定） ----
    ※ 保存は settings.studyLevel（ID文字列）と settings.customStudy のみ。
-     旧セーブに無い場合は必ず lv3 にフォールバックする（データ非破壊）。 */
+     旧セーブに無い場合は必ず lv3 にフォールバックする（データ非破壊）。
+   ※ コイン倍率は「問題数に比例」して自動計算（レベルで直接指定しない）。 */
 const STUDY_LEVELS = [
-  { id:"lv1",    badge:"Lv1",    name:"すきま時間", count:5,  mult:1.00, note:"スキマ時間にやさしい" },
-  { id:"lv2",    badge:"Lv2",    name:"ふつう",     count:8,  mult:1.03, note:"ちょっとずつ積み上げ" },
-  { id:"lv3",    badge:"Lv3",    name:"まじめ",     count:10, mult:1.05, note:"おすすめ・デフォルト" },
-  { id:"lv4",    badge:"Lv4",    name:"がんばり屋", count:15, mult:1.15, note:"本気で取り組む" },
-  { id:"lv5",    badge:"Lv5",    name:"ダイハード", count:20, mult:1.30, note:"テスト直前・限界突破" },
-  { id:"custom", badge:"カスタム", name:"マイペース", count:10, mult:1.05, note:"問題数と倍率を自由に" }
+  { id:"lv1",    badge:"Lv1",    name:"すきま時間", count:5,  note:"スキマ時間にやさしい" },
+  { id:"lv2",    badge:"Lv2",    name:"ふつう",     count:8,  note:"ちょっとずつ積み上げ" },
+  { id:"lv3",    badge:"Lv3",    name:"まじめ",     count:10, note:"おすすめ・デフォルト" },
+  { id:"lv4",    badge:"Lv4",    name:"がんばり屋", count:15, note:"本気で取り組む" },
+  { id:"lv5",    badge:"Lv5",    name:"ダイハード", count:20, note:"テスト直前・限界突破" },
+  { id:"custom", badge:"カスタム", name:"マイペース", count:10, note:"問題数を自由に設定" }
 ];
 function clampNum(v, min, max, dflt){
   const n = Number(v);
   return (isFinite(n)) ? Math.min(max, Math.max(min, n)) : dflt;
+}
+/** コイン倍率＝問題数に比例（5問ごとに ×1.05 を乗算）
+    5問=×1.05 / 8問=×1.08 / 10問=×1.10 / 15問=×1.16 / 20問=×1.22 / 30問=×1.34 */
+function levelMult(count){
+  return Math.pow(1.05, clampNum(count, 1, 60, 10) / 5);
 }
 /** 現在の学習レベル（壊れた保存値・未保存時は Lv3「まじめ」） */
 function getStudyLevel(){
@@ -1783,23 +1794,21 @@ function getStudyLevel(){
   const id = STUDY_LEVELS.some(l => l.id === s.studyLevel) ? s.studyLevel : "lv3";
   if (id !== "custom"){
     const lv = STUDY_LEVELS.find(l => l.id === id) || STUDY_LEVELS[2];
-    return Object.assign({}, lv);
+    return Object.assign({}, lv, { mult: levelMult(lv.count) });   // 倍率は問題数から自動計算
   }
   const c = (s.customStudy && typeof s.customStudy === "object") ? s.customStudy : {};
+  const count = Math.round(clampNum(c.count, 5, 30, 10));
   return {
     id:"custom", badge:"カスタム",
     name: (typeof c.name === "string" && c.name.trim()) ? c.name.trim().slice(0, 10) : "マイペース",
-    count: Math.round(clampNum(c.count, 5, 30, 10)),
-    mult:  Math.round(clampNum(c.mult, 1, 3, 1.05) * 100) / 100,
-    note:"問題数と倍率を自由に"
+    count,
+    mult:  levelMult(count),                                       // 保存された mult は無視（問題数比例）
+    note:"問題数を自由に設定"
   };
 }
-/** 現在のコイン倍率 = レベル基準倍率 × 1.05^(セッション中に解いた5問ごと) */
+/** 現在のコイン倍率（問題数比例・セッション進捗には依存しない） */
 function currentCoinMult(){
-  const base = getStudyLevel().mult;
-  let solved = 0;
-  try{ solved = session ? (session.correct + session.wrong) : 0; }catch(e){ solved = 0; }   // 初期化前でも安全
-  return base * Math.pow(1.05, Math.floor(solved / 5));
+  return getStudyLevel().mult;
 }
 /** コイン獲得量（倍率を適用して端数処理） */
 function coinGain(base){
@@ -2083,24 +2092,31 @@ function showView(name){
 const daysRange = document.getElementById("daysRange");
 const daysNum = document.getElementById("daysNum");
 const daysDate = document.getElementById("daysDate");
+const noExamChk = document.getElementById("noExamChk");
 
 function renderSetup(){
   daysRange.value = state.settings.days;
+  noExamChk.checked = state.settings.noExam === true;
   updateSetupLabels();
 }
 function updateSetupLabels(){
   const d = Number(daysRange.value);
   daysNum.textContent = d;
-  daysDate.textContent = "テスト日: " + fmtDate(addDaysISO(todayISO(), d - 1));
+  daysDate.textContent = noExamChk.checked
+    ? "📅 テスト日なしモード（復習間隔の目安: " + d + " 日）"
+    : "テスト日: " + fmtDate(addDaysISO(todayISO(), d - 1));
 }
 daysRange.addEventListener("input", updateSetupLabels);
+noExamChk.addEventListener("change", updateSetupLabels);
 
 document.getElementById("btnStartSetup").addEventListener("click", () => {
   state.settings.days = Number(daysRange.value);
-  state.settings.examDate = addDaysISO(todayISO(), state.settings.days - 1);
+  state.settings.noExam = noExamChk.checked;
+  state.settings.examDate = noExamChk.checked ? null : addDaysISO(todayISO(), state.settings.days - 1);
   state.settings.started = true;
   saveState();
   showView("home");
+  if (state.settings.noExam) toast("📅 テスト日なしモードで開始しました（いつでも学習できます）");
 });
 
 /* =========================================================================
@@ -2119,10 +2135,10 @@ function renderLevelUI(){
       const c = (state.settings.customStudy && typeof state.settings.customStudy === "object")
                 ? state.settings.customStudy : {};
       count = Math.round(clampNum(c.count, 5, 30, 10));
-      mult  = Math.round(clampNum(c.mult, 1, 3, 1.05) * 100) / 100;
+      mult  = levelMult(count);                                    // 倍率は問題数から自動計算
       name  = (typeof c.name === "string" && c.name.trim()) ? c.name.trim().slice(0, 10) : "マイペース";
     }else{
-      count = l.count; mult = l.mult; name = l.name;
+      count = l.count; mult = levelMult(l.count); name = l.name;
     }
     return `<button type="button" class="level-chip ${cur.id === l.id ? "on" : ""}" data-lv="${l.id}">
       <span class="lv">${l.badge}${l.id === "lv3" ? '<i class="rec">★おすすめ</i>' : ""}</span>
@@ -2138,12 +2154,10 @@ function renderLevelUI(){
   panel.classList.toggle("hidden", cur.id !== "custom");
   const nameIn = document.getElementById("lvCustomName");
   const cntIn  = document.getElementById("lvCountRange");
-  const mulIn  = document.getElementById("lvMultRange");
   if (document.activeElement !== nameIn) nameIn.value = cur.name;
   if (document.activeElement !== cntIn)  cntIn.value  = cur.count;
-  if (document.activeElement !== mulIn)  mulIn.value  = cur.mult;
   document.getElementById("lvCountVal").textContent = cur.count;
-  document.getElementById("lvMultVal").textContent  = "×" + cur.mult.toFixed(2);
+  document.getElementById("lvMultVal").textContent  = "×" + cur.mult.toFixed(2);   // 問題数から自動計算
 }
 function setStudyLevel(id){
   state.settings.studyLevel = STUDY_LEVELS.some(l => l.id === id) ? id : "lv3";
@@ -2160,21 +2174,17 @@ function updateCustomLevel(applyUI){
             ? state.settings.customStudy : (state.settings.customStudy = {});
   const nameIn = document.getElementById("lvCustomName");
   const cntIn  = document.getElementById("lvCountRange");
-  const mulIn  = document.getElementById("lvMultRange");
   c.name  = (nameIn.value || "").trim().slice(0, 10) || "マイペース";
   c.count = Math.round(clampNum(cntIn.value, 5, 30, 10));
-  c.mult  = Math.round(clampNum(mulIn.value, 1, 3, 1.05) * 100) / 100;
   state.settings.studyLevel = "custom";
   document.getElementById("lvCountVal").textContent = c.count;
-  document.getElementById("lvMultVal").textContent  = "×" + c.mult.toFixed(2);
+  document.getElementById("lvMultVal").textContent  = "×" + levelMult(c.count).toFixed(2);   // 問題数比例
   saveState();
   renderHome();
-  if (applyUI){ renderLevelUI(); toast(`カスタムレベル：1回 ${c.count}問 ・ コイン×${c.mult.toFixed(2)}〜`); }
+  if (applyUI){ renderLevelUI(); toast(`カスタムレベル：1回 ${c.count}問 ・ コイン×${levelMult(c.count).toFixed(2)}`); }
 }
 document.getElementById("lvCountRange").addEventListener("input", () => updateCustomLevel(false));
-document.getElementById("lvMultRange").addEventListener("input",  () => updateCustomLevel(false));
 document.getElementById("lvCountRange").addEventListener("change", () => updateCustomLevel(true));
-document.getElementById("lvMultRange").addEventListener("change",  () => updateCustomLevel(true));
 document.getElementById("lvCustomName").addEventListener("change", () => updateCustomLevel(true));
 
 function renderHome(){
@@ -2184,9 +2194,13 @@ function renderHome(){
 
   document.getElementById("ring").style.setProperty("--pct", s.mastery);
   document.getElementById("ringPct").textContent = s.mastery + "%";
-  document.getElementById("homeDaysLeft").textContent = left;
-  document.getElementById("homeExamDate").textContent =
-    fmtDate(state.settings.examDate) + " がテスト日（残り " + left + " 日）";
+  const noExam = !state.settings.examDate;                       // テスト日なし＝いつでも学習モード
+  document.getElementById("homeDaysLine").innerHTML = noExam
+    ? "📅 <b>テスト日なし</b>（いつでも学習モード）"
+    : "テストまで <b>" + left + "</b> 日";
+  document.getElementById("homeExamDate").textContent = noExam
+    ? "自由学習モード（復習はLeitner方式で自動調整）"
+    : fmtDate(state.settings.examDate) + " がテスト日（残り " + left + " 日）";
 
   const queue = buildQueue();
   const lv = getStudyLevel();
@@ -2662,7 +2676,7 @@ function sanitizeCustom(list){
 /** バックアップ内容で state をまるごと置き換える（欠損は既定値、壊れた値は破棄） */
 function restoreFullState(saved){
   const s = (saved.settings && typeof saved.settings === "object") ? saved.settings : {};
-  state.settings = Object.assign({ started:false, days:7, examDate:null, se:true, subjectFilter:[],
+  state.settings = Object.assign({ started:false, days:7, examDate:null, noExam:false, se:true, subjectFilter:[],
                                    studyLevel:"lv3", customStudy:{ name:"マイペース", count:10, mult:1.05 } }, s);
   if (typeof state.settings.started !== "boolean") state.settings.started = false;
   if (typeof state.settings.se !== "boolean") state.settings.se = true;
@@ -3919,7 +3933,7 @@ if (state.settings.started){ saveState(); checkMission(); }   // 起動時に自
 window.addEventListener("beforeunload", () => saveState());
 document.addEventListener("visibilitychange", () => { if (document.hidden) saveState(); });
 
-if (state.settings.started && state.settings.examDate) showView("home");
+if (state.settings.started) showView("home");   // テスト日なし（examDate null）でもホームへ復帰できるように
 else showView("setup");
 </script>
 </body>
