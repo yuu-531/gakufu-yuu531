@@ -2367,12 +2367,24 @@ function startSession(queue, mode){
   if (!qs.length){ toast(isCram ? "追い込める問題がありません（定着済みですね🎉）" : "出す問題がありません"); return; }
   session = { queue: qs, idx:0, judged:false, revealed:false,
               chosen:null, isCorrect:false, correct:0, wrong:0,
-              upgrades:0, reps:{}, mode: mode || "normal", coins:0 };
+              upgrades:0, reps:{}, mode: mode || "normal", coins:0,
+              choiceOrder:null, answerPos:null };   // 選択肢の毎回シャッフル用
   showView("study");
   renderCard();
 }
 
 function currentQ(){ return QUESTIONS.find(q => q.id === session.queue[session.idx]); }
+
+/** 選択肢の表示順を毎回ランダムに入れ替える（正解が常に1番目にならないように）
+    返り値＝表示位置ごとの「元のインデックス」 */
+function shuffledOrder(n){
+  const arr = Array.from({length:n}, (_, i) => i);
+  for (let i = arr.length - 1; i > 0; i--){
+    const j = Math.floor(Math.random() * (i + 1));
+    const t = arr[i]; arr[i] = arr[j]; arr[j] = t;
+  }
+  return arr;
+}
 
 function renderCard(){
   const q = currentQ();
@@ -2396,14 +2408,17 @@ function renderCard(){
     ? "頭の中で答えを思い出してから選択しよう"
     : "頭の中で答えを思い出してから Space で答え合わせ！";
 
-  // 選択肢（記述問題なら空）
+  // 選択肢（記述問題なら空）— 出題のたびにランダムに入れ替えて表示（正解が常に1番目にならない対策）
   const box = document.getElementById("qChoices");
   box.innerHTML = "";
-  q.choices.forEach((c, i) => {
+  const order = shuffledOrder(q.choices.length);    // 表示位置 → 元のインデックス
+  session.choiceOrder = order;
+  session.answerPos = q.choices.length ? order.indexOf(q.answer) : null;   // 正解の表示上の位置
+  order.forEach((origIdx, pos) => {
     const b = document.createElement("button");
     b.className = "choice";
-    b.innerHTML = `<span class="no">${i+1}</span><span>${escapeHtml(c)}</span>`;
-    b.addEventListener("click", () => choose(i));
+    b.innerHTML = `<span class="no">${pos+1}</span><span>${escapeHtml(q.choices[origIdx])}</span>`;
+    b.addEventListener("click", () => choose(pos));
     box.appendChild(b);
   });
 
@@ -2445,17 +2460,17 @@ function reveal(){
   updateControls();
 }
 
-function choose(i){
+function choose(pos){
   if (!session || session.judged) return;
   const q = currentQ();
-  const ok = i === q.answer;
-  session.chosen = i;
+  const ok = pos === session.answerPos;             // 表示位置 vs 正解の表示位置（シャッフル済み）
+  session.chosen = pos;
   // 選択肢の色付け
   const btns = [...document.querySelectorAll("#qChoices .choice")];
   btns.forEach((b, idx) => {
     b.disabled = true;
-    if (idx === q.answer) b.classList.add("correct");
-    else if (idx === i) b.classList.add("wrong");
+    if (idx === session.answerPos) b.classList.add("correct");
+    else if (idx === pos) b.classList.add("wrong");
   });
   reveal();
   judge(ok);
@@ -2483,7 +2498,7 @@ function judge(isCorrect){
   if (session.chosen != null){
     ya.className = "your-answer " + (isCorrect ? "ok" : "ng");
     ya.textContent = (isCorrect ? "あなたの答え: 正解（" : "あなたの答え: ") +
-      (session.chosen + 1) + "番 → " + q.choices[session.chosen] + (isCorrect ? "）" : "）");
+      (session.chosen + 1) + "番 → " + q.choices[(session.choiceOrder || [])[session.chosen]] + (isCorrect ? "）" : "");
   }else{
     ya.className = "your-answer " + (isCorrect ? "ok" : "ng");
     ya.textContent = isCorrect ? "あなたは「覚えた」を選択 ✅" : "あなたは「もう一度」を選択 🔁";
