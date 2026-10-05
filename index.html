@@ -858,14 +858,14 @@
       </div>
     </div>
 
-    <h2 class="section-title">学習レベル（コイン倍率・追い込み学習の問題数）</h2>
+    <h2 class="section-title">学習レベル（1回の出題数・コイン倍率・追い込み学習の問題数）</h2>
     <div class="card-surface" style="padding:14px 16px;">
       <div class="level-chips" id="levelChips"></div>
       <div id="customLevelBox" class="hidden" style="margin-top:12px; display:grid; gap:12px;">
         <div class="row2">
           <div class="field"><label for="lvCustomName">レベル名</label>
             <input type="text" id="lvCustomName" maxlength="10" placeholder="マイペース"></div>
-          <div class="field"><label for="lvCountRange">コイン倍率の基準問題数 <b id="lvCountVal">10</b> 問（5〜30）</label>
+          <div class="field"><label for="lvCountRange">1回の出題数＝コイン倍率の基準 <b id="lvCountVal">10</b> 問（5〜30）</label>
             <input type="range" id="lvCountRange" min="5" max="30" step="1" value="10" aria-label="問題数"></div>
         </div>
         <div class="muted" style="font-size:.86rem; font-weight:800;">
@@ -874,7 +874,7 @@
       </div>
       <div class="muted" style="font-size:.85rem; font-weight:700; margin-top:10px;">
         💡 <b>コイン倍率は問題数に比例</b>（5問=×1.05、10問=×1.10、15問=×1.16、20問=×1.22）。迷ったら <b>Lv3「まじめ」</b>がおすすめ！<br>
-        ▶ 学習は<b>出題キューをぜんぶ出すので制限なし</b>。この問題数はコイン倍率と「追い込み学習」の出題数の基準です。
+        ▶ 1回の学習は<b>この問題数ぶんだけ</b>（出題予定が積み上がっても 1回ずつ順番に出ます）。この問題数はコイン倍率・「追い込み学習」・1回の出題数のすべての基準です。
       </div>
     </div>
 
@@ -1070,6 +1070,21 @@
           <span class="muted" style="font-size:.85rem; font-weight:700;" id="bankCount"></span>
           <span class="spacer" style="flex:1;"></span>
           <button class="mini-btn" id="btnExportQ">⬇ JSON</button>
+        </div>
+        <div class="field" style="margin-bottom:8px; padding-top:10px; border-top:1px dashed var(--line);">
+          <label>📤 共有用エクスポート（問題データだけ・進捗なし／教科・単元で絞り込み）</label>
+          <div class="row2">
+            <select id="expSubject" aria-label="教科でしぼり込む"></select>
+            <select id="expUnit" aria-label="単元でしぼり込む"></select>
+          </div>
+          <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-top:8px;">
+            <button class="mini-btn" id="btnExportSel">⬇ JSON保存</button>
+            <button class="mini-btn" id="btnExportSelCopy">📋 コピー</button>
+            <span class="muted" id="expCount" style="font-size:.82rem; font-weight:700;"></span>
+          </div>
+          <div class="muted" style="font-size:.78rem; margin-top:6px; font-weight:700;">
+            書き出したJSONは受け取った人が上の「📥 JSONでも一括追加」でそのまま読めます（単元・教科つき）。
+          </div>
         </div>
         <div class="bank-list" id="bankList"></div>
       </div>
@@ -1440,9 +1455,19 @@ let state = {
   }
 };
 
+/** 単元名を安全に取得（旧データに unit が無い場合は「単元未設定」を補完して表示） */
+function unitOf(q){
+  const u = q && typeof q.unit === "string" ? q.unit.trim() : "";
+  return u || "単元未設定";
+}
+
 /** 出題対象を再構築（標準（削除分を除く） ＋ カスタム問題） */
 function applyQuestions(){
   const removed = state.removedDefaults || [];
+  /* 旧データ互換：単元（unit）が無い問題には unit キーだけ補完する（他の内容は一切変更しない） */
+  for (const q of state.custom){
+    if (q && typeof q === "object" && (typeof q.unit !== "string" || !q.unit.trim())) q.unit = "単元未設定";
+  }
   QUESTIONS = DEFAULT_QUESTIONS
     .filter(q => !removed.includes(q.id))
     .concat(state.custom.filter(q => q && q.id && q.question && q.answer !== undefined && q.answer !== null));
@@ -1792,7 +1817,7 @@ const SE = (function(){
 const REWARD = { correct:10, wrong:1, clear:30, mission:100, dailyBase:30, dailyStep:10, dailyCap:120 };
 
 /* ---- 学習レベル（コイン倍率の基準問題数と追い込み学習の問題数を決める／Lv3 が既定の推奨設定） ----
-   ※ 学習セッション自体は出題キューをぜんぶ出す（レベルで切りない・制限なし）。
+   ※ 1回の学習セッションはレベルの問題数ぶんだけ（通常・追い込み・自由練習すべて同じ基準）。
    ※ 保存は settings.studyLevel（ID文字列）と settings.customStudy のみ。
      旧セーブに無い場合は必ず lv3 にフォールバックする（データ非破壊）。
    ※ コイン倍率は「問題数に比例」して自動計算（レベルで直接指定しない）。 */
@@ -2191,7 +2216,7 @@ function setStudyLevel(id){
   const lv = getStudyLevel();
   renderLevelUI();
   renderHome();
-  toast(`学習レベル ${lv.badge}「${lv.name}」：コイン×${lv.mult.toFixed(2)} ・ 追い込み ${lv.count}問（学習自体はぜんぶ出題）`);
+  toast(`学習レベル ${lv.badge}「${lv.name}」：コイン×${lv.mult.toFixed(2)} ・ 1回 ${lv.count} 問ずつ出題（追い込み学習も同じ数）`);
 }
 /** カスタムレベルの値を保存（スライダー連動・入力中も画面を壊さない） */
 function updateCustomLevel(applyUI){
@@ -2229,9 +2254,13 @@ function renderHome(){
 
   const queue = buildQueue();
   const lv = getStudyLevel();
-  const planQueue = queue;                             // 制限なし：出題キューをぜんぶ（学習レベルで切らない）
+  /* 1回分＝学習レベルの問題数だけ表示・出題する（問題を一括追加しても
+     「今日の学習」の計画が異常な数にならないように） */
+  const planQueue = queue.slice(0, lv.count);
+  const restQueue = queue.length - planQueue.length;      // 次回以降に回す残り
   const newInQueue = planQueue.filter(id => !state.progress[id].seen).length;
   const reviewInQueue = planQueue.length - newInQueue;
+  const fpN = Math.min(freePracticeQueue().length, lv.count);   // 自由練習も1回分だけ
 
   document.getElementById("planReview").textContent = reviewInQueue;
   document.getElementById("planNew").textContent = newInQueue;
@@ -2252,16 +2281,17 @@ function renderHome(){
 
   const h = state.history[todayISO()];
   document.getElementById("todayPlanText").textContent = planQueue.length
-    ? `復習 ${reviewInQueue} 問 ＋ 新規 ${newInQueue} 問 ＝ ぜんぶ ${planQueue.length} 問（${lv.badge}「${lv.name}」・コイン×${lv.mult.toFixed(2)}）`
-    : (h ? `今日の復習はすべて完了！ 🔁 自由練習でぜんぶ ${freePracticeQueue().length} 問もう一回できます。`
-         : `出題予定なし ＋ 🔁 自由練習（ぜんぶ ${freePracticeQueue().length} 問）でも学習できます`);
+    ? `復習 ${reviewInQueue} 問 ＋ 新規 ${newInQueue} 問 ＝ 1回 ${planQueue.length} 問（${lv.badge}「${lv.name}」・コイン×${lv.mult.toFixed(2)}）`
+      + (restQueue > 0 ? `。※出題予定は全部で ${queue.length} 問・1回 ${lv.count} 問ずつ順番に出ます` : "")
+    : (h ? `今日の復習はすべて完了！ 🔁 自由練習で ${fpN} 問もう一回できます。`
+         : `出題予定なし ＋ 🔁 自由練習（1回 ${fpN} 問）でも学習できます`);
 
-  /* 学習開始の制限なし：出題予定がなくても自由練習として開始できる */
+  /* 開き方は自由（出題予定がなくても自由練習で開始できる）。ただし1回ぶんは学習レベルの問題数だけ */
   const btnStart = document.getElementById("btnStartStudy");
   btnStart.disabled = false;
   btnStart.textContent = planQueue.length
     ? "▶ 今日の学習をはじめる"
-    : `🔁 自由練習をはじめる（ぜんぶ ${freePracticeQueue().length} 問）`;
+    : `🔁 自由練習をはじめる（1回 ${fpN} 問）`;
   document.getElementById("btnCram").textContent = `💪 苦手だけ追い込み学習（${lv.count}問）`;
 
   // 教科別バー
@@ -2283,13 +2313,14 @@ function renderHome(){
 
   // キュープレビュー
   const qp = document.getElementById("queuePreview");
-  if (!planQueue.length){ qp.textContent = `出題予定なし（自由練習ならぜんぶ ${freePracticeQueue().length} 問から出ます）`; }
+  if (!planQueue.length){ qp.textContent = `出題予定なし（自由練習なら1回 ${fpN} 問から出ます）`; }
   else {
     qp.innerHTML = planQueue.slice(0, 12).map((id,i) => {
       const q = QUESTIONS.find(x => x.id === id);
       const isNew = !state.progress[id].seen;
-      return `<span class="chip" style="margin:3px 6px 3px 0;">${i+1}. ${q.subject}・${q.unit}${isNew ? "（新規）" : ""}</span>`;
-    }).join("") + (planQueue.length > 12 ? ` <span class="muted">…ほか ${planQueue.length-12} 問</span>` : "");
+      return `<span class="chip" style="margin:3px 6px 3px 0;">${i+1}. ${q.subject}・${unitOf(q)}${isNew ? "（新規）" : ""}</span>`;
+    }).join("") + (planQueue.length > 12 ? ` <span class="muted">…ほか ${planQueue.length - 12} 問</span>` : "")
+        + (restQueue > 0 ? ` <span class="muted">（＋ ${restQueue} 問は次回以降）</span>` : "");
   }
 
   // 問題一覧
@@ -2300,7 +2331,7 @@ function renderHome(){
     const dots = [0,1,2,3].map(i => `<i class="${i <= p.level ? "on" : ""}"></i>`).join("");
     return `<div class="q-row">
       <span class="badge" style="color:${SUBJECT_COLORS[q.subject] || "var(--accent)"}">${q.subject}</span>
-      <span><span class="unit">${q.unit}</span>${escapeHtml(q.question).slice(0,40)}${q.question.length > 40 ? "…" : ""}</span>
+      <span><span class="unit">${unitOf(q)}</span>${escapeHtml(q.question).slice(0,40)}${q.question.length > 40 ? "…" : ""}</span>
       <span class="lv" title="定着度レベル ${p.level}/3">${dots}</span>
       <span class="next">${p.seen ? "次回 " + fmtDate(p.nextReview) : "未出題"}</span>
     </div>`;
@@ -2363,11 +2394,11 @@ function escapeHtml(s){
 let session = null;
 
 function startSession(queue, mode){
-  /* 通常学習は無制限＝出題キューをぜんぶ出す（レベルの問題数で切らない）。
-     追い込み学習のみレベル設定の問題数ぶんだけ。 */
-  const isCram = (mode === "cram");
-  const qs = isCram ? queue.slice(0, getStudyLevel().count) : queue;
-  if (!qs.length){ toast(isCram ? "追い込める問題がありません（定着済みですね🎉）" : "出す問題がありません"); return; }
+  /* 1セッションは必ず学習レベルの問題数ぶんだけ（通常学習・追い込み学習・自由練習すべて同じ）。
+     問題を一括追加してもセッションの問題数が異常にならないようにするため。 */
+  const lv = getStudyLevel();
+  const qs = queue.slice(0, lv.count);
+  if (!qs.length){ toast(mode === "cram" ? "追い込める問題がありません（定着済みですね🎉）" : "出す問題がありません"); return; }
   session = { queue: qs, idx:0, judged:false, revealed:false,
               chosen:null, isCorrect:false, correct:0, wrong:0,
               upgrades:0, reps:{}, mode: mode || "normal", coins:0,
@@ -2403,7 +2434,7 @@ function renderCard(){
 
   document.getElementById("qSubject").textContent = q.subject;
   document.getElementById("qSubject").style.color = SUBJECT_COLORS[q.subject] || "var(--accent)";
-  document.getElementById("qUnit").textContent = "単元: " + q.unit;
+  document.getElementById("qUnit").textContent = "単元: " + unitOf(q);
   document.getElementById("qLevelTag").textContent = "定着度 " + p.level + "/3" +
     (p.seen ? "・次回復習 " + fmtDate(p.nextReview) : "・新規");
   updateLvTag();
@@ -2585,10 +2616,11 @@ function finishSession(){
   document.getElementById("doneUp").textContent = session.upgrades;
   const again = document.getElementById("btnAgain");
   const leftover = buildQueue();
-  again.disabled = false;                          // 制限なし：出題予定がなくても自由練習を続けられる
+  const lvN = getStudyLevel().count;               // 1回ぶんは学習レベルの問題数だけ
+  again.disabled = false;                          // 出題予定がなくても自由練習を続けられる
   again.textContent = leftover.length
-    ? `🔁 苦手をもう一周する（${leftover.length} 問）`
-    : `🔁 自由練習をはじめる（ぜんぶ ${freePracticeQueue().length} 問）`;
+    ? `🔁 苦手をもう一周する（1回 ${Math.min(leftover.length, lvN)} 問）`
+    : `🔁 自由練習をはじめる（1回 ${Math.min(freePracticeQueue().length, lvN)} 問）`;
   // 今回のセッションで間違えた問題は、その場でAI用に書き出せる
   const wrongN = (session.wrongIds || []).length;
   const doneAi = document.getElementById("btnDoneAi");
@@ -2611,7 +2643,8 @@ document.getElementById("btnQuit").addEventListener("click", () => {
 });
 function blur(){ if (document.activeElement && document.activeElement.blur) document.activeElement.blur(); }
 
-/* 学習開始＝制限なし。出題予定があればキューぜんぶ、無ければ自由練習（全問題） */
+/* 学習開始：出題予定があればそこから、無ければ自由練習（全問題から優先順）。
+   1回ぶんの問題数は startSession 内で学習レベル数に制限する */
 document.getElementById("btnStartStudy").addEventListener("click", () => {
   const q = buildQueue();
   startSession(q.length ? q : freePracticeQueue(), "normal");
@@ -2857,46 +2890,76 @@ function normalizeAnswerText(s){
     .toLowerCase();
 }
 
-/** 問題配列を1件ずつ検証して取り込む。追加件数を返す（0 = 全却下） */
-function ingestQuestions(arr){
-  if (!Array.isArray(arr)) return 0;
-  let added = 0;
-  for (const raw of arr){
-    if (!raw || typeof raw !== "object") continue;
-    const question = raw.question != null ? String(raw.question).trim() : "";
-    if (!question || raw.answer === undefined || raw.answer === null || raw.answer === "") continue;
+/**
+ * 受け取った1件を検証し、取り込み可能な問題オブジェクトにする（ダメなら null）。
+ * subject / unit が無いデータ（旧プロンプト・旧ファイル）には defaults の値を補完する。
+ */
+function buildCustomQuestion(raw, defaults){
+  defaults = defaults || {};
+  if (!raw || typeof raw !== "object") return null;
+  const question = raw.question != null ? String(raw.question).trim() : "";
+  if (!question || raw.answer === undefined || raw.answer === null || raw.answer === "") return null;
 
-    const choices = Array.isArray(raw.choices) ? raw.choices.map(c => String(c).trim()).filter(Boolean) : [];
-    if (choices.length === 1) continue;   // 選択肢は0または2個以上
+  const choices = Array.isArray(raw.choices) ? raw.choices.map(c => String(c).trim()).filter(Boolean) : [];
+  if (choices.length === 1) return null;   // 選択肢は0または2個以上
 
-    let answer;
-    if (choices.length){
-      if (typeof raw.answer === "number"){ if (!choices[raw.answer]) continue; answer = raw.answer; }
-      else{
-        const i = choices.findIndex(c => normalizeAnswerText(c) === normalizeAnswerText(raw.answer));
-        if (i < 0) continue;              // answer が選択肢に一致しない → 却下
-        answer = i;                       // アプリ内部では選択肢インデックスで保持
-      }
-    }else{
-      answer = String(raw.answer).trim();
-      if (!answer) continue;
+  let answer;
+  if (choices.length){
+    if (typeof raw.answer === "number"){ if (!choices[raw.answer]) return null; answer = raw.answer; }
+    else{
+      const i = choices.findIndex(c => normalizeAnswerText(c) === normalizeAnswerText(raw.answer));
+      if (i < 0) return null;              // answer が選択肢に一致しない → 却下
+      answer = i;                          // アプリ内部では選択肢インデックスで保持
     }
+  }else{
+    answer = String(raw.answer).trim();
+    if (!answer) return null;
+  }
 
-    const id = "u" + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
-    state.custom.push({
-      id,
-      subject: String(raw.subject || "自作").trim(),
-      unit: String(raw.unit || "追加問題").trim(),
-      question,
-      answer, choices,
-      explain: String(raw.explain || ""),
-      level:0, nextReview:null
-    });
+  const subject = raw.subject != null && String(raw.subject).trim()
+    ? String(raw.subject).trim()
+    : (String(defaults.subject || "").trim() || "自作");
+  const unit = raw.unit != null && String(raw.unit).trim()
+    ? String(raw.unit).trim()
+    : (String(defaults.unit || "").trim() || "単元未設定");
+  return {
+    id: "u" + Date.now().toString(36) + Math.random().toString(36).slice(2, 5),
+    subject, unit, question, answer, choices,
+    explain: String(raw.explain || ""),
+    level:0, nextReview:null
+  };
+}
+
+/**
+ * 問題配列を1件ずつ検証して取り込む。
+ * 返り値＝{ added, dup, invalid }
+ *  - dup   : 問題文が同じ問題をスキップ（貼り付けの二重実行などで問題数が
+ *            異常な数になるのを防ぐ）
+ *  - invalid: 形式エラー（answer が choices と不一致など）でスキップ
+ * defaults = 未指定の subject / unit を補完する値（AIジェネレーターの入力欄から渡す）
+ */
+function ingestQuestions(arr, defaults){
+  if (!Array.isArray(arr)) return { added:0, dup:0, invalid:0 };
+  let added = 0, dup = 0, invalid = 0;
+  const keyOf = q => normalizeAnswerText(q.subject) + "\u0000" + normalizeAnswerText(q.question);
+  const keys = new Set(QUESTIONS.map(keyOf));          // 既存問題とバッチ内の重複検出
+  const usedIds = new Set(QUESTIONS.map(q => q.id));   // ID衝突を回避
+  for (const raw of arr){
+    const q = buildCustomQuestion(raw, defaults);
+    if (!q){ invalid++; continue; }
+    const key = keyOf(q);
+    if (keys.has(key)){ dup++; continue; }
+    keys.add(key);
+    let id = q.id;
+    while (usedIds.has(id)) id += "~";
+    usedIds.add(id);
+    q.id = id;
+    state.custom.push(q);
     state.progress[id] = { level:0, nextReview:null, seen:false, correct:0, wrong:0 };
     added++;
   }
   if (added){ applyQuestions(); saveState(); }
-  return added;
+  return { added, dup, invalid };
 }
 
 /** AI出力からJSON配列を取り出す（コードフェンス・前後の文章が混ざっていてもOK） */
@@ -3084,7 +3147,7 @@ function renderEditor(){
     return `<div class="bank-row">
       <div>
         <div class="q">${escapeHtml(q.question)}</div>
-        <div class="sub">${escapeHtml(q.subject)}・${escapeHtml(q.unit)} ／ 定着度 ${p.level || 0}/3 ／ ${custom ? "自作" : "標準"}</div>
+        <div class="sub">${escapeHtml(q.subject)}・${escapeHtml(unitOf(q))} ／ 定着度 ${p.level || 0}/3 ／ ${custom ? "自作" : "標準"}</div>
       </div>
       <div class="acts">
         ${custom
@@ -3096,6 +3159,10 @@ function renderEditor(){
   }).join("");
   list.querySelectorAll("[data-edit]").forEach(b => b.addEventListener("click", () => startEdit(b.dataset.edit)));
   list.querySelectorAll("[data-del]").forEach(b => b.addEventListener("click", () => deleteQuestion(b.dataset.del)));
+
+  // 共有用エクスポートの教科・単元セレクトも最新の問題一覧に合わせる
+  populateShareFilters();
+  updateShareCount();
 }
 
 function resetForm(){
@@ -3114,7 +3181,7 @@ function startEdit(id){
   const choices = Array.isArray(q.choices) ? q.choices : [];
   editingId = id;
   setSubjectValue(PICKER_F, q.subject);
-  document.getElementById("fUnit").value = q.unit;
+  document.getElementById("fUnit").value = unitOf(q);
   document.getElementById("fQuestion").value = q.question;
   document.getElementById("fAnswer").value =
     choices.length && typeof q.answer === "number" && choices[q.answer] !== undefined
@@ -3212,6 +3279,101 @@ document.getElementById("btnExportQ").addEventListener("click", () => {
   toast("問題データを書き出しました");
 });
 
+/* ---- 共有用エクスポート（教科別・単元別に「問題だけ」を書き出す） ---- */
+function shareOption(v, t){
+  const o = document.createElement("option");
+  o.value = v; o.textContent = t;
+  return o;
+}
+/** 単元セレクトを作り直す（教科セレクトに連動） */
+function fillShareUnits(subj, keepUnit){
+  const unitSel = document.getElementById("expUnit");
+  const prev = keepUnit || "__all__";
+  const pool = QUESTIONS.filter(q => subj === "__all__" || q.subject === subj);
+  const units = [...new Set(pool.map(unitOf))]
+    .sort((a, b) => String(a).localeCompare(String(b), "ja"));
+  unitSel.innerHTML = "";
+  unitSel.appendChild(shareOption("__all__", `すべての単元（${pool.length} 問）`));
+  for (const u of units){
+    unitSel.appendChild(shareOption(u, `${u}（${pool.filter(q => unitOf(q) === u).length} 問）`));
+  }
+  unitSel.value = [...unitSel.options].some(o => o.value === prev) ? prev : "__all__";
+}
+/** 教科・単元セレクトを（維持しながら）作り直す */
+function populateShareFilters(){
+  const subjSel = document.getElementById("expSubject");
+  const prevSubj = subjSel.value;
+  const prevUnit = document.getElementById("expUnit").value;
+  const subjects = [...new Set(QUESTIONS.map(q => q.subject))];
+  subjSel.innerHTML = "";
+  subjSel.appendChild(shareOption("__all__", `すべての教科（${QUESTIONS.length} 問）`));
+  for (const s of subjects){
+    subjSel.appendChild(shareOption(s, `${s}（${QUESTIONS.filter(q => q.subject === s).length} 問）`));
+  }
+  subjSel.value = [...subjSel.options].some(o => o.value === prevSubj) ? prevSubj : "__all__";
+  fillShareUnits(subjSel.value, prevUnit);
+}
+/** 選択中の範囲の問題一覧 */
+function shareSelection(){
+  const subj = document.getElementById("expSubject").value;
+  const unit = document.getElementById("expUnit").value;
+  const list = QUESTIONS.filter(q =>
+    (subj === "__all__" || q.subject === subj) &&
+    (unit === "__all__" || unitOf(q) === unit));
+  return { subj, unit, list };
+}
+/** 読み込み互換の問題オブジェクト（unit 必須つき・進捗は含めない） */
+function sharePayload(list){
+  return list.map(q => ({
+    id: q.id,
+    subject: q.subject,
+    unit: unitOf(q),
+    question: q.question,
+    choices: Array.isArray(q.choices) ? q.choices : [],
+    answer: q.answer,
+    explain: q.explain || ""
+  }));
+}
+function shareFileName(subj, unit){
+  const bits = [];
+  if (subj !== "__all__") bits.push(subj);
+  if (unit !== "__all__") bits.push(unit);
+  const label = (bits.length ? bits.join("-") : "all").replace(/[\\/:*?"<>|]/g, "_");
+  return "gakufu-questions-" + label + "-" + todayISO() + ".json";
+}
+function updateShareCount(){
+  const { list } = shareSelection();
+  document.getElementById("expCount").textContent = `${list.length} 問を選択中`;
+}
+document.getElementById("expSubject").addEventListener("change", e => {
+  SE.play("click");
+  fillShareUnits(e.target.value);
+  updateShareCount();
+});
+document.getElementById("expUnit").addEventListener("change", () => {
+  SE.play("click");
+  updateShareCount();
+});
+document.getElementById("btnExportSel").addEventListener("click", () => {
+  const { subj, unit, list } = shareSelection();
+  if (!list.length){ toast("書き出す問題がありません"); return; }
+  const blob = new Blob([JSON.stringify(sharePayload(list), null, 2)], { type:"application/json" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = shareFileName(subj, unit);
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  SE.play("coin");
+  toast(`📤 ${list.length} 問を書き出しました（教科・単元つき）`);
+});
+document.getElementById("btnExportSelCopy").addEventListener("click", async () => {
+  const { list } = shareSelection();
+  if (!list.length){ toast("コピーする問題がありません"); return; }
+  const ok = await copyText(JSON.stringify(sharePayload(list), null, 2));
+  if (ok){ SE.play("coin"); toast(`📋 ${list.length} 問をコピーしました（AIや友だちに貼り付けOK）`); }
+  else toast("コピーに失敗しました");
+});
+
 /* JSONファイルからの一括インポート（共通の検証ロジックを使用） */
 document.getElementById("importFile").addEventListener("change", (e) => {
   const file = e.target.files && e.target.files[0];
@@ -3221,13 +3383,15 @@ document.getElementById("importFile").addEventListener("change", (e) => {
     try{
       const data = JSON.parse(reader.result);
       const arr = Array.isArray(data) ? data : (data.custom || data.questions || []);
-      const added = ingestQuestions(arr);
+      const r = ingestQuestions(arr);
       renderEditor();
-      if (added){
+      if (r.added){
         SE.play("levelup");
-        toast(`${added} 問をインポートしました 🎉`);
-        await afterIngest(added);    // ← 標準問題を削除するか確認メッセージ
+        toast(`${r.added} 問をインポートしました 🎉` + (r.dup ? `（重複 ${r.dup} 問はスキップ）` : ""));
+        await afterIngest(r.added);    // ← 標準問題を削除するか確認メッセージ
         renderEditor();
+      }else if (r.dup){
+        toast(`同じ問題がすでに登録済みです（重複 ${r.dup} 問はスキップしました）`);
       }else toast("読み込める問題が見つかりませんでした（形式を確認してください）");
     }catch(err){
       console.warn(err);
@@ -3343,7 +3507,8 @@ function buildPrompt(d){
    }
 4. answer は choices のいずれかと「文字列として完全一致」させる（1文字でも違えば取り込めない）
 5. choices は四択なら必ず4つ、記述問題なら必ず空配列 []
-6. 文字化けさせない。数式は x² のように Unicode を使ってよい
+6. 毎問必ず "unit" を入れる。中身は必ず「${d.unit}」そのまま（unit を省略したり変えたりしない）
+7. 文字化けさせない。数式は x² のように Unicode を使ってよい
 
 ━━━━━━━━━━━━━━━━━━━━
 ■ フォーマット例（この形を厳守）
@@ -3528,15 +3693,20 @@ document.getElementById("btnGenImport").addEventListener("click", async () => {
     toast("JSONとして読み取れませんでした。出力全体を貼り付けてください");
     return;
   }
-  const added = ingestQuestions(arr);
-  const skipped = arr.length - added;
-  if (added){
+  /* AI出力には unit / subject が無いことがある → いま入力している条件で補完する */
+  const gf = genFormValues();
+  const r = ingestQuestions(arr, { subject: gf.subject, unit: gf.unit });
+  if (r.added){
     SE.play("levelup");
     document.getElementById("genPaste").value = "";
-    rewardToast(`📥 ${added} 問を追加しました！`);
-    if (skipped > 0) setTimeout(() => toast(`⚠ 形式エラーで ${skipped} 問は取り込めませんでした（answer≠choices を確認）`), 1900);
-    await afterIngest(added);      // ← 標準問題を削除するか確認メッセージ
+    rewardToast(`📥 ${r.added} 問を追加しました！`);
+    if (r.dup > 0) setTimeout(() => toast(`♻ 同じ問題 ${r.dup} 問は重複のためスキップしました`), 1900);
+    if (r.invalid > 0) setTimeout(() => toast(`⚠ 形式エラーで ${r.invalid} 問は取り込めませんでした（answer≠choices を確認）`), 1900 + (r.dup > 0 ? 1900 : 0));
+    await afterIngest(r.added);      // ← 標準問題を削除するか確認メッセージ
     showView("editor");
+  }else if (r.dup > 0){
+    SE.play("wrong");
+    toast(`読み込もうとした問題はすべて登録済みです（重複 ${r.dup} 問をスキップしました）`);
   }else{
     SE.play("wrong");
     toast("1問も取り込めませんでした。answer が choices と一致しているか確認してください");
@@ -3645,7 +3815,7 @@ function buildWrongPrompt(list, scopeNote){
   out.push("");
   list.forEach((r, i) => {
     const q = r.q, p = r.p;
-    out.push("── 問題 " + (i+1) + " ［" + q.subject + "］単元: " + q.unit);
+    out.push("── 問題 " + (i+1) + " ［" + q.subject + "］単元: " + unitOf(q));
     out.push("問: " + q.question);
     if (q.choices.length){
       out.push("選択肢:");
@@ -3685,7 +3855,7 @@ function groupAgg(rows, keyFn){
   for (const r of rows){
     const k = keyFn(r);
     if (!map.has(k)){
-      map.set(k, { subject:r.q.subject, unit:r.q.unit, n:0, answered:0, correct:0, levelSum:0, mastered:0 });
+      map.set(k, { subject:r.q.subject, unit:unitOf(r.q), n:0, answered:0, correct:0, levelSum:0, mastered:0 });
     }
     const g = map.get(k);
     g.n++; g.answered += r.answered; g.correct += r.p.correct;
@@ -3698,7 +3868,7 @@ function groupAgg(rows, keyFn){
     return g;
   });
 }
-const groupByUnit    = rows => groupAgg(rows, r => r.q.subject + " " + r.q.unit);
+const groupByUnit    = rows => groupAgg(rows, r => r.q.subject + " " + unitOf(r.q));
 const groupBySubject = rows => groupAgg(rows, r => r.q.subject);
 
 /** 過去n日（今日を含む）の日別学習記録 */
@@ -3889,7 +4059,7 @@ function renderQTable(rows){
   const el = document.getElementById("qTable");
   const kw = statsUI.search.trim().toLowerCase();
   const list = kw
-    ? rows.filter(r => `${r.q.question} ${r.q.unit} ${r.q.subject}`.toLowerCase().includes(kw))
+    ? rows.filter(r => `${r.q.question} ${unitOf(r.q)} ${r.q.subject}`.toLowerCase().includes(kw))
     : rows;
   document.getElementById("stRowCount").textContent = `${list.length} / ${QUESTIONS.length} 問`;
   if (!list.length){
@@ -3900,7 +4070,7 @@ function renderQTable(rows){
   const cols = [
     { key:"subject", label:"教科", val:r => r.q.subject,
       cell:r => `<b style="color:${SUBJECT_COLORS[r.q.subject] || "var(--text)"}">${escapeHtml(r.q.subject)}</b>` },
-    { key:"unit", label:"単元", val:r => r.q.unit, cell:r => escapeHtml(r.q.unit) },
+    { key:"unit", label:"単元", val:r => unitOf(r.q), cell:r => escapeHtml(unitOf(r.q)) },
     { key:"question", label:"問題", cls:"wrap", val:r => r.q.question,
       cell:r => escapeHtml(r.q.question.length > 40 ? r.q.question.slice(0, 40) + "…" : r.q.question) },
     { key:"answered", label:"解答数", cls:"num", val:r => r.answered, cell:r => r.answered + " 問" },
@@ -3961,7 +4131,7 @@ document.getElementById("btnStatsCsv").addEventListener("click", async () => {
   if (!lastQRows.length){ toast("コピーできる問題がありません"); return; }
   const head = ["教科", "単元", "問題", "解答数", "正答率(%)", "レベル", "次回復習"];
   const lines = [head.join(",")].concat(lastQRows.map(r => [
-    r.q.subject, r.q.unit, r.q.question, r.answered,
+    r.q.subject, unitOf(r.q), r.q.question, r.answered,
     r.accPct === null ? "" : r.accPct, "L" + r.level, r.next || "未出題"
   ].map(v => `"${String(v).replace(/"/g, '""')}"`).join(",")));
   const ok = await copyText("\uFEFF" + lines.join("\r\n"));   // BOM付き（Excelでも文字化けしない）
